@@ -7,76 +7,74 @@ export interface BirdSampledParticle {
   normal: THREE.Vector3;
   color: THREE.Color;
   size: number;
-  flowOrder: number;         // 0.0 -> 1.0: order of formation (tips -> leading edge -> body -> tail -> interior)
-  spineProg: number;         // 0.0 -> 1.0: distance along tail -> body -> wing -> tip for lime pulse
+  flowOrder: number;         // 0.0 -> 1.0: order of formation
   zoneId: number;            // 0: body/head, 1: upper wing, 2: lower wing, 3: tail
+  spanNorm: number;          // 0.0 (root) -> 1.0 (tip)
+  chordNorm: number;         // 0.0 (leading edge) -> 1.0 (trailing edge)
+  edgeType: number;          // 0: leading edge, 1: interior, 2: trailing edge, 3: needle tip
+  spineProg: number;         // 0.0 (tail) -> 1.0 (wingtips) for lime signal pulse
 }
 
 /**
- * Creates a sickle-shaped aerodynamic swift wing geometry.
+ * Builds a natural, curved sickle wing surface between two intentional 3D guide curves:
+ * leadingEdgeCurve and trailingEdgeCurve.
  */
-function createSickleWingGeometry(
-  rootPos: THREE.Vector3,
-  midPos: THREE.Vector3,
-  tipPos: THREE.Vector3,
-  rootChord: number,
-  midChord: number,
-  tipChord: number,
-  curvatureZ: number,
-  steps: number = 40,
-  crossSegments: number = 8
+function createCurvedSickleWing(
+  leadPoints: THREE.Vector3[],
+  trailPoints: THREE.Vector3[],
+  camberHeight: number,
+  spanSteps: number = 48,
+  chordSteps: number = 10
 ): THREE.BufferGeometry {
-  const curve = new THREE.QuadraticBezierCurve3(rootPos, midPos, tipPos);
-  const frames = curve.computeFrenetFrames(steps, false);
+  const leadCurve = new THREE.CatmullRomCurve3(leadPoints, false, 'centripetal', 0.5);
+  const trailCurve = new THREE.CatmullRomCurve3(trailPoints, false, 'centripetal', 0.5);
 
   const vertices: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const pt = curve.getPointAt(t);
-    const normal = frames.normals[i];
-    const binormal = frames.binormals[i];
+  for (let i = 0; i <= spanSteps; i++) {
+    const u = i / spanSteps; // span: 0 (root) to 1 (tip)
+    const pLead = leadCurve.getPointAt(u);
+    const pTrail = trailCurve.getPointAt(u);
 
-    // Chord tapers smoothly from root to needle tip
-    let chord = rootChord * (1 - t) + tipChord * t;
-    if (t > 0.5) {
-      const subT = (t - 0.5) / 0.5;
-      chord = midChord * (1 - subT) + tipChord * subT;
-    } else {
-      const subT = t / 0.5;
-      chord = rootChord * (1 - subT) + midChord * subT;
-    }
+    // Tangent along leading edge for calculating camber normal
+    const tangent = leadCurve.getTangentAt(u);
+    const chordVec = new THREE.Vector3().subVectors(pTrail, pLead);
+    const wingNormal = new THREE.Vector3().crossVectors(tangent, chordVec).normalize();
 
-    const thickness = chord * 0.14;
+    // Camber profile: parabolic arch peak at 30% chord, fading to 0 at tip
+    const spanCamber = Math.sin((1.0 - u * 0.85) * Math.PI * 0.5) * camberHeight;
 
-    for (let j = 0; j <= crossSegments; j++) {
-      const u = (j / crossSegments) * Math.PI * 2;
-      const cosU = Math.cos(u);
-      const sinU = Math.sin(u);
+    for (let j = 0; j <= chordSteps; j++) {
+      const v = j / chordSteps; // chord: 0 (lead) to 1 (trail)
 
-      // Aerodynamic camber: leading edge thicker, trailing edge thin
-      const camber = Math.sin(u * 0.5) * (chord * 0.08);
+      // Base interpolation between lead and trail curves
+      const pt = new THREE.Vector3().lerpVectors(pLead, pTrail, v);
 
-      const offsetX = binormal.clone().multiplyScalar(cosU * (chord * 0.5));
-      const offsetY = normal.clone().multiplyScalar(sinU * (thickness * 0.5) + camber);
-      offsetY.z += Math.sin(t * Math.PI) * curvatureZ;
+      // Add aerodynamic camber arch
+      const camberArch = Math.sin(v * Math.PI) * spanCamber;
+      pt.addScaledVector(wingNormal, camberArch);
 
-      const vert = pt.clone().add(offsetX).add(offsetY);
-      vertices.push(vert.x, vert.y, vert.z);
+      vertices.push(pt.x, pt.y, pt.z);
 
-      const norm = binormal.clone().multiplyScalar(cosU).addScaledVector(normal, sinU).normalize();
-      normals.push(norm.x, norm.y, norm.z);
+      // Normal vector approximation
+      const n = wingNormal.clone();
+      if (v < 0.2) {
+        n.addScaledVector(chordVec.clone().normalize(), -0.4).normalize();
+      } else if (v > 0.8) {
+        n.addScaledVector(chordVec.clone().normalize(), 0.3).normalize();
+      }
+      normals.push(n.x, n.y, n.z);
 
-      uvs.push(t, j / crossSegments);
+      uvs.push(u, v);
     }
   }
 
-  const rowSize = crossSegments + 1;
-  for (let i = 0; i < steps; i++) {
-    for (let j = 0; j < crossSegments; j++) {
+  const rowSize = chordSteps + 1;
+  for (let i = 0; i < spanSteps; i++) {
+    for (let j = 0; j < chordSteps; j++) {
       const a = i * rowSize + j;
       const b = (i + 1) * rowSize + j;
       const c = (i + 1) * rowSize + (j + 1);
@@ -98,71 +96,151 @@ function createSickleWingGeometry(
 }
 
 /**
- * Creates the streamlined aerodynamic fuselage and head of the swift.
+ * Creates the organic, continuous aerodynamic fuselage:
+ * Head -> Neck transition -> Thorax (with seamless wing root shoulders) -> Tapered body -> Tail root.
  */
-function createSwiftBodyGeometry(): THREE.BufferGeometry {
-  const points: THREE.Vector3[] = [];
-  const segments = 24;
+function createOrganicSwiftFuselage(): THREE.BufferGeometry {
+  const steps = 36;
+  const radialSegments = 16;
 
-  // Head at t=1, tail root at t=0
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    // Curved spine: slight arc
-    const x = Math.sin(t * Math.PI) * 0.08;
-    const y = (t - 0.45) * 1.55;
-    const z = Math.cos(t * Math.PI) * 0.12;
-    points.push(new THREE.Vector3(x, y, z));
+  // S-curved aerodynamic central spine
+  // t=0: tail root, t=0.5: thorax/wing root, t=0.82: neck, t=1.0: head
+  const spinePoints: THREE.Vector3[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const y = (t - 0.42) * 1.65; // from y=-0.70 to y=+0.95
+    const x = Math.sin(t * Math.PI) * 0.12 - (t - 0.5) * 0.08;
+    const z = Math.cos(t * Math.PI * 0.9) * 0.14 - 0.04;
+    spinePoints.push(new THREE.Vector3(x, y, z));
+  }
+  const spineCurve = new THREE.CatmullRomCurve3(spinePoints, false, 'centripetal', 0.5);
+  const frames = spineCurve.computeFrenetFrames(steps, false);
+
+  const vertices: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const pt = spineCurve.getPointAt(t);
+    const normal = frames.normals[i];
+    const binormal = frames.binormals[i];
+
+    // Anatomical width & depth profile of a swift:
+    // Tail root (t=0..0.25): thin oval
+    // Thorax (t=0.35..0.65): wide shoulders where wings connect seamlessly
+    // Neck (t=0.7..0.82): tapered transition
+    // Head (t=0.85..1.0): rounded aerodynamic dome
+    let rx = 0.08;
+    let rz = 0.06;
+
+    if (t < 0.3) {
+      // Tail root
+      const subT = t / 0.3;
+      rx = 0.06 + subT * 0.12;
+      rz = 0.04 + subT * 0.08;
+    } else if (t <= 0.7) {
+      // Thorax / Wing shoulders (widest point)
+      const subT = (t - 0.3) / 0.4;
+      const bulge = Math.sin(subT * Math.PI);
+      rx = 0.18 + bulge * 0.10; // widest laterally for wing roots
+      rz = 0.12 + bulge * 0.06;
+    } else if (t <= 0.85) {
+      // Neck
+      const subT = (t - 0.7) / 0.15;
+      rx = 0.20 - subT * 0.08;
+      rz = 0.14 - subT * 0.05;
+    } else {
+      // Head
+      const subT = (t - 0.85) / 0.15;
+      const dome = Math.sin((1.0 - subT) * Math.PI * 0.5);
+      rx = 0.12 * dome;
+      rz = 0.09 * dome;
+    }
+
+    for (let j = 0; j <= radialSegments; j++) {
+      const theta = (j / radialSegments) * Math.PI * 2;
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+
+      const offset = binormal.clone().multiplyScalar(cosT * rx).addScaledVector(normal, sinT * rz);
+      const v = pt.clone().add(offset);
+      vertices.push(v.x, v.y, v.z);
+
+      const n = offset.clone().normalize();
+      normals.push(n.x, n.y, n.z);
+
+      uvs.push(t, j / radialSegments);
+    }
   }
 
-  const curve = new THREE.CatmullRomCurve3(points);
-  const geom = new THREE.TubeGeometry(curve, 32, 0.18, 12, false);
+  const rowSize = radialSegments + 1;
+  for (let i = 0; i < steps; i++) {
+    for (let j = 0; j < radialSegments; j++) {
+      const a = i * rowSize + j;
+      const b = (i + 1) * rowSize + j;
+      const c = (i + 1) * rowSize + (j + 1);
+      const d = i * rowSize + (j + 1);
 
-  // Deform tube to aerodynamic oval section
-  const pos = geom.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i);
-    // Taper head and tail
-    const normY = (y + 0.8) / 1.6;
-    const scale = Math.sin(Math.max(0, Math.min(1, normY)) * Math.PI) * 0.85 + 0.15;
-    pos.setX(i, pos.getX(i) * scale * 1.25);
-    pos.setZ(i, pos.getZ(i) * scale * 0.8);
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
   }
 
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geom.setIndex(indices);
   geom.computeVertexNormals();
+
   return geom;
 }
 
 /**
- * Creates the split/forked tail of the swift.
+ * Creates the narrow, tapering split/forked tail of the swift:
+ * Continuous tail root dividing into two distinct prongs.
  */
-function createForkedTailGeometry(): THREE.BufferGeometry {
-  // Left fork
-  const leftPoints = [
-    new THREE.Vector3(-0.06, -0.65, 0.0),
-    new THREE.Vector3(-0.16, -1.05, -0.08),
-    new THREE.Vector3(-0.28, -1.45, -0.15),
+function createOrganicForkedTail(): THREE.BufferGeometry {
+  // Left Fork
+  const leadLeft = [
+    new THREE.Vector3(-0.06, -0.68, 0.02),
+    new THREE.Vector3(-0.14, -0.98, -0.06),
+    new THREE.Vector3(-0.25, -1.35, -0.14),
   ];
-  const rightPoints = [
-    new THREE.Vector3(0.06, -0.65, 0.0),
-    new THREE.Vector3(0.18, -1.10, -0.10),
-    new THREE.Vector3(0.32, -1.50, -0.18),
+  const trailLeft = [
+    new THREE.Vector3(-0.01, -0.68, 0.01),
+    new THREE.Vector3(-0.04, -0.92, -0.04),
+    new THREE.Vector3(-0.22, -1.32, -0.13),
   ];
+  const leftFork = createCurvedSickleWing(leadLeft, trailLeft, 0.03, 16, 4);
 
-  const leftGeom = createSickleWingGeometry(leftPoints[0], leftPoints[1], leftPoints[2], 0.22, 0.12, 0.03, 0.05, 20, 6);
-  const rightGeom = createSickleWingGeometry(rightPoints[0], rightPoints[1], rightPoints[2], 0.22, 0.12, 0.03, 0.05, 20, 6);
+  // Right Fork
+  const leadRight = [
+    new THREE.Vector3(0.06, -0.68, 0.02),
+    new THREE.Vector3(0.16, -1.02, -0.08),
+    new THREE.Vector3(0.28, -1.40, -0.16),
+  ];
+  const trailRight = [
+    new THREE.Vector3(0.01, -0.68, 0.01),
+    new THREE.Vector3(0.05, -0.95, -0.05),
+    new THREE.Vector3(0.25, -1.37, -0.15),
+  ];
+  const rightFork = createCurvedSickleWing(leadRight, trailRight, 0.03, 16, 4);
 
-  // Merge geometries
-  const leftPos = leftGeom.attributes.position.array;
-  const rightPos = rightGeom.attributes.position.array;
-  const mergedPos = new Float32Array(leftPos.length + rightPos.length);
-  mergedPos.set(leftPos, 0);
-  mergedPos.set(rightPos, leftPos.length);
+  // Merge forks
+  const lPos = leftFork.attributes.position.array;
+  const rPos = rightFork.attributes.position.array;
+  const mergedPos = new Float32Array(lPos.length + rPos.length);
+  mergedPos.set(lPos, 0);
+  mergedPos.set(rPos, lPos.length);
 
-  const leftNorm = leftGeom.attributes.normal.array;
-  const rightNorm = rightGeom.attributes.normal.array;
-  const mergedNorm = new Float32Array(leftNorm.length + rightNorm.length);
-  mergedNorm.set(leftNorm, 0);
-  mergedNorm.set(rightNorm, leftNorm.length);
+  const lNorm = leftFork.attributes.normal.array;
+  const rNorm = rightFork.attributes.normal.array;
+  const mergedNorm = new Float32Array(lNorm.length + rNorm.length);
+  mergedNorm.set(lNorm, 0);
+  mergedNorm.set(rNorm, lNorm.length);
 
   const geom = new THREE.BufferGeometry();
   geom.setAttribute('position', new THREE.BufferAttribute(mergedPos, 3));
@@ -173,38 +251,60 @@ function createForkedTailGeometry(): THREE.BufferGeometry {
 }
 
 /**
- * Builds the full procedural 3D swift mesh components.
- * Large scale placed on right side of viewport ($X \approx +0.85, Y \approx +0.32$).
+ * Builds the complete 3D swift anatomy positioned dynamically on the right:
+ * Centroid around $X \approx +0.85, Y \approx +0.32$.
  */
 export function generateBirdGeometries(): {
-  body: THREE.BufferGeometry;
+  fuselage: THREE.BufferGeometry;
   upperWing: THREE.BufferGeometry;
   lowerWing: THREE.BufferGeometry;
   tail: THREE.BufferGeometry;
 } {
-  const center = new THREE.Vector3(0.85, 0.32, -0.10);
+  const center = new THREE.Vector3(0.85, 0.32, -0.08);
 
-  // 1. Body & Head
-  const body = createSwiftBodyGeometry();
-  body.translate(center.x, center.y, center.z);
+  // 1. Organic Fuselage (Head, Neck, Thorax, Body)
+  const fuselage = createOrganicSwiftFuselage();
+  fuselage.translate(center.x, center.y, center.z);
 
-  // 2. Upper Wing (Sweeping upward, outward, and back)
-  const upperRoot = new THREE.Vector3(0.12, 0.22, 0.05).add(center);
-  const upperMid = new THREE.Vector3(1.15, 1.05, -0.15).add(center);
-  const upperTip = new THREE.Vector3(2.15, 1.75, -0.38).add(center);
-  const upperWing = createSickleWingGeometry(upperRoot, upperMid, upperTip, 0.72, 0.42, 0.05, 0.35, 45, 8);
+  // 2. Upper / Right Wing: Large rising sickle curve
+  // Connected seamlessly to thorax shoulder at (center + [0.18, 0.28, 0.04])
+  const upperLead = [
+    new THREE.Vector3(0.18, 0.28, 0.04).add(center),
+    new THREE.Vector3(0.68, 0.72, -0.02).add(center),
+    new THREE.Vector3(1.35, 1.28, -0.15).add(center),
+    new THREE.Vector3(2.05, 1.72, -0.32).add(center),
+    new THREE.Vector3(2.55, 1.98, -0.45).add(center), // needle tip
+  ];
+  const upperTrail = [
+    new THREE.Vector3(0.12, 0.02, 0.02).add(center), // wing root trailing edge at thorax
+    new THREE.Vector3(0.52, 0.45, -0.04).add(center),
+    new THREE.Vector3(1.15, 0.95, -0.18).add(center),
+    new THREE.Vector3(1.92, 1.55, -0.34).add(center),
+    new THREE.Vector3(2.52, 1.95, -0.44).add(center), // joins needle tip
+  ];
+  const upperWing = createCurvedSickleWing(upperLead, upperTrail, 0.16, 52, 10);
 
-  // 3. Lower Wing (Dynamic 3/4 turn: downward, outward, slightly forward)
-  const lowerRoot = new THREE.Vector3(-0.12, 0.10, 0.02).add(center);
-  const lowerMid = new THREE.Vector3(-0.65, -0.45, 0.18).add(center);
-  const lowerTip = new THREE.Vector3(-1.25, -0.92, 0.32).add(center);
-  const lowerWing = createSickleWingGeometry(lowerRoot, lowerMid, lowerTip, 0.65, 0.36, 0.04, -0.28, 45, 8);
+  // 3. Lower / Left Wing: Foreshortened 3/4 turn sickle curve
+  // Connected seamlessly to port shoulder at (center + [-0.18, 0.22, 0.02])
+  const lowerLead = [
+    new THREE.Vector3(-0.18, 0.22, 0.02).add(center),
+    new THREE.Vector3(-0.52, -0.08, 0.12).add(center),
+    new THREE.Vector3(-0.95, -0.45, 0.24).add(center),
+    new THREE.Vector3(-1.42, -0.85, 0.35).add(center), // needle tip
+  ];
+  const lowerTrail = [
+    new THREE.Vector3(-0.12, -0.04, 0.01).add(center), // port wing root trailing edge
+    new THREE.Vector3(-0.40, -0.28, 0.10).add(center),
+    new THREE.Vector3(-0.78, -0.62, 0.22).add(center),
+    new THREE.Vector3(-1.38, -0.82, 0.34).add(center), // joins needle tip
+  ];
+  const lowerWing = createCurvedSickleWing(lowerLead, lowerTrail, -0.14, 44, 10);
 
-  // 4. Forked Tail
-  const tail = createForkedTailGeometry();
+  // 4. Forked Tail: Continuous with tail root
+  const tail = createOrganicForkedTail();
   tail.translate(center.x, center.y, center.z);
 
-  return { body, upperWing, lowerWing, tail };
+  return { fuselage, upperWing, lowerWing, tail };
 }
 
 function createPRNG(seed: number) {
@@ -217,29 +317,29 @@ function createPRNG(seed: number) {
 }
 
 /**
- * Samples deterministic particles across the swift with variable density:
- * - Leading edges: dense
- * - Body: dense
- * - Head: moderately dense
- * - Wing interior: medium density
- * - Trailing edges: lighter, fragmented
- * - Tail: precise split tips
+ * Samples deterministic particles across the swift with the required density hierarchy:
+ * - Densest along head and body (3.0x)
+ * - Dense along wing roots and leading edges (2.5x)
+ * - Medium through wing interiors (1.0x)
+ * - Lighter along trailing edges (0.6x)
+ * - Precise accents at wing tips
+ * - Cleanly separated tail forks
  */
 export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
-  const { body, upperWing, lowerWing, tail } = generateBirdGeometries();
-  const rand = createPRNG(78912345);
+  const { fuselage, upperWing, lowerWing, tail } = generateBirdGeometries();
+  const rand = createPRNG(987654321);
 
   const particles: BirdSampledParticle[] = [];
 
-  // Distribution weights:
-  // Upper wing: 42% of particles
-  // Lower wing: 34% of particles
-  // Body & Head: 16% of particles
-  // Forked Tail: 8% of particles
-  const countUpper = Math.floor(totalCount * 0.42);
-  const countLower = Math.floor(totalCount * 0.34);
-  const countBody = Math.floor(totalCount * 0.16);
-  const countTail = totalCount - countUpper - countLower - countBody;
+  // Distribution counts:
+  // Upper Wing: 45% of particles
+  // Lower Wing: 30% of particles
+  // Fuselage (Body + Head): 18% of particles
+  // Forked Tail: 7% of particles
+  const countUpper = Math.floor(totalCount * 0.45);
+  const countLower = Math.floor(totalCount * 0.30);
+  const countFuselage = Math.floor(totalCount * 0.18);
+  const countTail = totalCount - countUpper - countLower - countFuselage;
 
   const colIvory = new THREE.Color(HERO_COLORS.IVORY_SILVER);
   const colGraphite = new THREE.Color(HERO_COLORS.GRAPHITE_DARK);
@@ -250,8 +350,9 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
     count: number,
     zoneId: number
   ) {
-    const posAttr = geom.attributes.position;
-    const normAttr = geom.attributes.normal;
+    const posAttr = geom.getAttribute('position') as THREE.BufferAttribute;
+    const normAttr = geom.getAttribute('normal') as THREE.BufferAttribute;
+    const uvAttr = geom.getAttribute('uv') as THREE.BufferAttribute | undefined;
     const index = geom.index;
 
     const numTriangles = index ? index.count / 3 : posAttr.count / 3;
@@ -259,6 +360,7 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
     for (let i = 0; i < count; i++) {
       let v0 = new THREE.Vector3(), v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
       let n0 = new THREE.Vector3(), n1 = new THREE.Vector3(), n2 = new THREE.Vector3();
+      let uv0 = new THREE.Vector2(), uv1 = new THREE.Vector2(), uv2 = new THREE.Vector2();
 
       if (index) {
         const tri = Math.floor(rand() * numTriangles);
@@ -273,6 +375,12 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
         n0.fromBufferAttribute(normAttr, i0);
         n1.fromBufferAttribute(normAttr, i1);
         n2.fromBufferAttribute(normAttr, i2);
+
+        if (uvAttr) {
+          uv0.fromBufferAttribute(uvAttr, i0);
+          uv1.fromBufferAttribute(uvAttr, i1);
+          uv2.fromBufferAttribute(uvAttr, i2);
+        }
       } else {
         const idx = Math.floor(rand() * (posAttr.count - 2));
         v0.fromBufferAttribute(posAttr, idx);
@@ -304,32 +412,66 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
         .addScaledVector(n2, r2)
         .normalize();
 
-      // Sparse field starting point for Act 1 (dispersed in aerodynamic swirl)
-      const sparseTheta = rand() * Math.PI * 2;
-      const sparseRad = 1.4 + rand() * 2.8;
-      const sparseHeight = (rand() - 0.5) * 4.0;
-      const initialPos = new THREE.Vector3(
-        targetPos.x + Math.cos(sparseTheta) * sparseRad,
-        targetPos.y + sparseHeight,
-        targetPos.z + Math.sin(sparseTheta) * (sparseRad * 0.6)
-      );
+      // UV coordinates (span and chord)
+      const uv = new THREE.Vector2()
+        .addScaledVector(uv0, r0)
+        .addScaledVector(uv1, r1)
+        .addScaledVector(uv2, r2);
 
-      // Act 2 & 3 flow formation order:
-      // Wing tips & leading edges form first (0.0 -> 0.3)
-      // Head & body form next (0.3 -> 0.6)
-      // Tail forms next (0.6 -> 0.8)
-      // Wing interior fills in last (0.8 -> 1.0)
-      let flowOrder = 0.5;
+      const spanNorm = Math.max(0, Math.min(1, uv.x));
+      const chordNorm = Math.max(0, Math.min(1, uv.y));
+
+      // Edge type classification:
+      // 0: leading edge (chord < 0.18)
+      // 1: interior (0.18 <= chord <= 0.78)
+      // 2: trailing edge (chord > 0.78)
+      // 3: wing needle tip (span > 0.90)
+      let edgeType = 1;
       if (zoneId === 1 || zoneId === 2) {
-        // Wings: tips and leading edge first
-        const distFromCenter = targetPos.distanceTo(new THREE.Vector3(0.85, 0.32, -0.10));
-        flowOrder = Math.max(0, Math.min(1, 1.0 - (distFromCenter / 2.6) * 0.75 + (rand() - 0.5) * 0.2));
+        if (spanNorm > 0.90) {
+          edgeType = 3;
+        } else if (chordNorm < 0.18) {
+          edgeType = 0;
+        } else if (chordNorm > 0.78) {
+          edgeType = 2;
+        }
       } else if (zoneId === 0) {
-        // Body
-        flowOrder = 0.35 + rand() * 0.25;
+        // Fuselage
+        edgeType = 0; // treated as primary anatomical anchor
       } else {
         // Tail
-        flowOrder = 0.65 + rand() * 0.25;
+        edgeType = 2;
+      }
+
+      // Sparse field starting coordinate for Act 1:
+      // Dispersed in an aerodynamic vortex around the scene
+      const theta = rand() * Math.PI * 2;
+      const rad = 1.6 + rand() * 2.8;
+      const height = (rand() - 0.5) * 4.2;
+      const initialPos = new THREE.Vector3(
+        targetPos.x + Math.cos(theta) * rad,
+        targetPos.y + height,
+        targetPos.z + Math.sin(theta) * (rad * 0.7)
+      );
+
+      // Formation sequence ordering (0.0 to 1.0):
+      // Wing tips & leading edges arrive first (0.0 -> 0.3)
+      // Body and head resolve next (0.3 -> 0.6)
+      // Forked tail resolves next (0.6 -> 0.8)
+      // Wing interior fills in last (0.8 -> 1.0)
+      let flowOrder = 0.5;
+      if (edgeType === 3 || edgeType === 0) {
+        // Tips and leading edge
+        flowOrder = 0.05 + rand() * 0.25;
+      } else if (zoneId === 0) {
+        // Body / Head
+        flowOrder = 0.32 + rand() * 0.28;
+      } else if (zoneId === 3) {
+        // Tail
+        flowOrder = 0.62 + rand() * 0.20;
+      } else {
+        // Wing interior and trailing edge
+        flowOrder = 0.78 + rand() * 0.22;
       }
 
       // Normalized spine progress for lime signal pulse (0 = tail, 0.4 = body, 1.0 = wingtips)
@@ -339,15 +481,15 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
       } else if (zoneId === 0) {
         spineProg = 0.3 + ((targetPos.y - 0.32) + 0.8) * 0.25;
       } else {
-        const wingDist = targetPos.distanceTo(new THREE.Vector3(0.85, 0.32, -0.10));
+        const wingDist = targetPos.distanceTo(new THREE.Vector3(0.85, 0.32, -0.08));
         spineProg = 0.5 + Math.min(0.5, (wingDist / 2.6) * 0.5);
       }
       spineProg = Math.max(0, Math.min(1, spineProg));
 
       // Color assignment:
-      // ~81% pale ivory/cool silver
+      // ~81% pale ivory / cool silver
       // ~14% dark graphite ghost particles
-      // ~5% acid lime particles
+      // ~5% acid lime signal particles
       const roll = rand();
       let color: THREE.Color;
       if (roll < 0.05) {
@@ -360,8 +502,8 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
         color.offsetHSL(0, 0, (rand() - 0.5) * 0.05);
       }
 
-      // Small refined footprint (1px to 2px, highlights 2.5px)
-      const size = roll < 0.05 ? 2.2 : 1.1 + rand() * 0.9;
+      // Particle scale: refined footprint (1.0px to 2.2px, highlights 2.5px)
+      const size = roll < 0.05 ? 2.4 : 1.1 + rand() * 0.9;
 
       particles.push({
         targetPos,
@@ -370,15 +512,18 @@ export function sampleBirdParticles(totalCount: number): BirdSampledParticle[] {
         color,
         size,
         flowOrder,
-        spineProg,
         zoneId,
+        spanNorm,
+        chordNorm,
+        edgeType,
+        spineProg,
       });
     }
   }
 
   sampleComponent(upperWing, countUpper, 1);
   sampleComponent(lowerWing, countLower, 2);
-  sampleComponent(body, countBody, 0);
+  sampleComponent(fuselage, countFuselage, 0);
   sampleComponent(tail, countTail, 3);
 
   return particles;

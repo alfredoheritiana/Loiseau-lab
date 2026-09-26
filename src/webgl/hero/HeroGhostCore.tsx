@@ -8,17 +8,17 @@ interface HeroGhostCoreProps {
 }
 
 export const HeroGhostCore: React.FC<HeroGhostCoreProps> = ({ opacity = 0.08 }) => {
-  const { body, upperWing, lowerWing, tail } = useMemo(() => generateBirdGeometries(), []);
+  const { fuselage, upperWing, lowerWing, tail } = useMemo(() => generateBirdGeometries(), []);
 
-  // Smoked dark glass / graphite material (Subtle 5–10% visual presence only)
-  const matBody = useMemo(
+  // Smoked dark glass / graphite material (Subtle 5–8% visual presence only)
+  const matFuselage = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
         color: HERO_COLORS.GHOST_CORE_BODY,
-        roughness: 0.25,
-        metalness: 0.85,
-        clearcoat: 0.5,
-        clearcoatRoughness: 0.2,
+        roughness: 0.22,
+        metalness: 0.88,
+        clearcoat: 0.6,
+        clearcoatRoughness: 0.18,
         transparent: true,
         opacity: opacity,
         depthWrite: false,
@@ -30,10 +30,10 @@ export const HeroGhostCore: React.FC<HeroGhostCoreProps> = ({ opacity = 0.08 }) 
     () =>
       new THREE.MeshPhysicalMaterial({
         color: HERO_COLORS.GHOST_CORE_WING,
-        roughness: 0.35,
-        metalness: 0.3,
+        roughness: 0.32,
+        metalness: 0.35,
         transparent: true,
-        opacity: opacity * 0.75, // Even lighter on wings to let particles lead
+        opacity: opacity * 0.75, // Even lighter on wings so particles dominate
         depthWrite: false,
       }),
     [opacity]
@@ -41,10 +41,10 @@ export const HeroGhostCore: React.FC<HeroGhostCoreProps> = ({ opacity = 0.08 }) 
 
   return (
     <group name="hero-swift-ghost-core" renderOrder={1}>
-      <mesh geometry={body} material={matBody} />
+      <mesh geometry={fuselage} material={matFuselage} />
       <mesh geometry={upperWing} material={matWing} />
       <mesh geometry={lowerWing} material={matWing} />
-      <mesh geometry={tail} material={matBody} />
+      <mesh geometry={tail} material={matFuselage} />
     </group>
   );
 };

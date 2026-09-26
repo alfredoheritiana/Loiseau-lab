@@ -9,13 +9,13 @@ import { HERO_TIERS } from './heroConfig';
 interface HeroParticleBirdProps {
   onReady?: () => void;
   scrollProgress?: number;
-  formationTime: number; // In seconds since hero mounted
 }
 
 const velocityShader = `
   uniform float uTime;
   uniform float uDelta;
   uniform float uFormationTime;
+  uniform float uLivingTime;
   uniform float uScrollProgress;
   uniform vec3 uPointer;
   uniform vec2 uPointerVel;
@@ -37,63 +37,123 @@ const velocityShader = `
     vec4 posData = texture2D(texturePosition, uv);
     vec4 velData = texture2D(textureVelocity, uv);
     vec4 origData = texture2D(uOriginTexture, uv); // xyz: targetPos, w: flowOrder
-    vec4 metaData = texture2D(uMetaTexture, uv);   // xyz: initialPos, w: zoneId
+    vec4 metaData = texture2D(uMetaTexture, uv);   // x: spanNorm, y: chordNorm, z: edgeType, w: zoneId
 
     vec3 pos = posData.xyz;
     vec3 vel = velData.xyz;
     vec3 targetPos = origData.xyz;
-    vec3 initialPos = metaData.xyz;
     float flowOrder = origData.w;
+
+    float spanNorm = metaData.x;
+    float chordNorm = metaData.y;
+    float edgeType = metaData.z;
     float zoneId = metaData.w;
 
-    // 1. Progressive 4-Act Formation Target Interpolation
-    // Order: wing tips -> leading edges -> body -> tail -> wing interior
-    float formProg = clamp((uFormationTime - 0.25 - flowOrder * 0.75) / 1.15, 0.0, 1.0);
+    // -------------------------------------------------------------
+    // 1. PROGRESSIVE 8-STATE FORMATION (Strictly Monotonic, Never Resets)
+    // Order: wing tips -> leading edges -> body/head -> tail -> wing interior
+    // -------------------------------------------------------------
+    float formProg = clamp((uFormationTime - 0.20 - flowOrder * 0.90) / 1.10, 0.0, 1.0);
     float smoothForm = smoothstep(0.0, 1.0, formProg);
+
+    // Initial position in sparse vortex field
+    float theta = uv.x * 6.28318;
+    float rad = 1.8 + uv.y * 2.8;
+    vec3 initialPos = vec3(
+      targetPos.x + cos(theta) * rad,
+      targetPos.y + (uv.y - 0.5) * 4.2,
+      targetPos.z + sin(theta) * (rad * 0.7)
+    );
+
     vec3 currentRestingPos = mix(initialPos, targetPos, smoothForm);
 
-    // Act 4: Subtle living aerodynamic presence (tiny wingtip flex & breathing)
-    if (smoothForm > 0.85) {
-      float tipFlex = (zoneId == 1.0 ? 1.0 : (zoneId == 2.0 ? -0.7 : 0.0));
-      float flexAmount = sin(uTime * 1.95 + pos.x * 0.8) * 0.04 * tipFlex;
-      currentRestingPos.z += flexAmount;
-      currentRestingPos.y += flexAmount * 0.35;
-    }
+    // -------------------------------------------------------------
+    // 2. PERMANENT MULTI-LAYERED LIVING MOTION (Active once formed)
+    // -------------------------------------------------------------
+    if (smoothForm > 0.82) {
+      float t = uLivingTime;
 
-    // Scroll Dissolve: particles peel and dissolve backward into flow matter
-    if (uScrollProgress > 0.35) {
-      float dissolveThreshold = 0.35 + flowOrder * 0.45;
-      if (uScrollProgress > dissolveThreshold) {
-        float dissolveRatio = (uScrollProgress - dissolveThreshold) / 0.35;
-        currentRestingPos.z -= dissolveRatio * 4.5;
-        currentRestingPos.x += (fract(sin(uv.x * 43.12) * 123.4) - 0.5) * dissolveRatio * 3.0;
-        currentRestingPos.y += sin(uTime * 2.0 + uv.y * 12.0) * dissolveRatio * 1.8;
+      // A. Whole-Form Glide: Slow, irregular non-repeating trajectory
+      float glideY = sin(t * 0.28) * 0.024 + sin(t * 0.17 + 1.2) * 0.018;
+      float glideX = cos(t * 0.22) * 0.016 + sin(t * 0.14 + 0.8) * 0.012;
+      float glideBank = sin(t * 0.25) * 0.014;
+
+      currentRestingPos.y += glideY;
+      currentRestingPos.x += glideX;
+      // Banking rotation around spine
+      currentRestingPos.z += (currentRestingPos.x - 0.85) * glideBank;
+
+      // B. Wing Torsion & Independent Flex (Span-dependent)
+      if (zoneId == 1.0) {
+        // Upper Starboard Wing
+        float torsion = sin(t * 0.85 + spanNorm * 1.5) * 0.052 * pow(spanNorm, 1.8);
+        currentRestingPos.z += torsion;
+        currentRestingPos.y += torsion * 0.4;
+      } else if (zoneId == 2.0) {
+        // Lower Port Wing (independent phase & amplitude)
+        float torsion = sin(t * 0.72 + spanNorm * 1.5 + 1.4) * 0.038 * pow(spanNorm, 1.8);
+        currentRestingPos.z += torsion;
+        currentRestingPos.y += torsion * 0.35;
+      }
+
+      // C. Trailing-Edge Shimmer vs Leading-Edge Tension
+      if (chordNorm > 0.75) {
+        float shimmer = sin(t * 2.2 + pos.x * 2.8) * 0.024 * pow(chordNorm, 2.0);
+        currentRestingPos.z += shimmer;
+      }
+
+      // D. Forked-Tail Steering
+      if (zoneId == 3.0) {
+        float tailFlex = sin(t * 0.65 + (pos.x > 0.85 ? 0.0 : 1.2)) * 0.032;
+        currentRestingPos.x += tailFlex;
+      }
+
+      // E. Body / Thorax Aerodynamic Breathing
+      if (zoneId == 0.0) {
+        float pulse = sin(t * 1.1) * 0.008;
+        currentRestingPos.x += (currentRestingPos.x - 0.85) * pulse * 2.0;
+        currentRestingPos.z += pulse;
       }
     }
 
-    // 2. Aerodynamic Restoring Spring Force
+    // -------------------------------------------------------------
+    // 3. SCROLL DISSOLVE & REVERSIBLE RECONSTRUCTION
+    // -------------------------------------------------------------
+    if (uScrollProgress > 0.30) {
+      float dissolveThreshold = 0.30 + flowOrder * 0.50;
+      if (uScrollProgress > dissolveThreshold) {
+        float dissolveRatio = (uScrollProgress - dissolveThreshold) / 0.35;
+        currentRestingPos.z -= dissolveRatio * 4.8;
+        currentRestingPos.x += (fract(sin(uv.x * 43.12) * 123.4) - 0.5) * dissolveRatio * 3.2;
+        currentRestingPos.y += sin(uTime * 2.2 + uv.y * 14.0) * dissolveRatio * 2.0;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 4. AERODYNAMIC SPRING RESTORING FORCE
+    // -------------------------------------------------------------
     vec3 returnDir = currentRestingPos - pos;
     vec3 returnForce = returnDir * uReturnStrength;
 
-    // 3. Air / Wind Cursor Wake Interaction
+    // -------------------------------------------------------------
+    // 5. AIR / WIND CURSOR WAKE INTERACTION & TRAIL MEMORY
+    // -------------------------------------------------------------
     vec3 windForce = vec3(0.0);
 
-    // Evaluate active pointer
+    // Active Pointer Wind Wake
     vec3 toPointer = pos - uPointer;
     float distSq = toPointer.x * toPointer.x + toPointer.y * toPointer.y + toPointer.z * toPointer.z * 1.8;
     float dist = sqrt(max(0.0001, distSq));
 
     if (dist < uPointerRadius) {
       float factor = 1.0 - smoothstep(0.0, uPointerRadius, dist);
-      // Aerodynamic air displacement: push away and sweep along cursor wake
       vec3 repelDir = normalize(toPointer);
       vec3 wakeDir = vec3(uPointerVel.x, uPointerVel.y, 0.0);
-      float pushMagnitude = factor * (1.2 + uPointerSpeed * 1.1) * 5.8;
-
-      windForce += (repelDir * 0.65 + wakeDir * 0.5) * pushMagnitude;
+      float pushMagnitude = factor * (1.2 + uPointerSpeed * 1.2) * 6.2;
+      windForce += (repelDir * 0.65 + wakeDir * 0.55) * pushMagnitude;
     }
 
-    // Evaluate short-lived cursor trail memory (wind wake propagation)
+    // Wind Wake Trail Memory (Propagating short-lived air wake)
     for (int i = 0; i < MAX_TRAIL; i++) {
       if (uTrailAge[i] > 0.0 && uTrailAge[i] < 0.65) {
         vec3 toTrail = pos - uTrailPos[i];
@@ -103,23 +163,18 @@ const velocityShader = `
           float decay = 1.0 - (uTrailAge[i] / 0.65);
           float trailFactor = (1.0 - smoothstep(0.0, trailRadius, trailDist)) * decay;
           vec3 trailWind = vec3(uTrailVel[i].x, uTrailVel[i].y, 0.0);
-          windForce += trailWind * trailFactor * 3.2;
+          windForce += trailWind * trailFactor * 3.5;
         }
       }
     }
 
-    // 4. Subtle Internal Circulation & Micro Motion
-    float phase = velData.w;
-    vec3 microCirculation = vec3(
-      sin(uTime * 0.55 + phase * 6.28) * 0.02,
-      cos(uTime * 0.45 + phase * 6.28) * 0.016,
-      sin(uTime * 0.65 + phase * 6.28) * 0.014
-    );
-
-    // Accumulate and integrate
-    vec3 accel = returnForce + windForce + microCirculation;
+    // -------------------------------------------------------------
+    // 6. ACCUMULATE AND INTEGRATE (Viscous Damping for Graceful Return)
+    // -------------------------------------------------------------
+    vec3 accel = returnForce + windForce;
     vel = (vel + accel * uDelta) * uDamping;
 
+    float phase = velData.w;
     gl_FragColor = vec4(vel, phase);
   }
 `;
@@ -141,8 +196,8 @@ const renderVertexShader = `
   uniform sampler2D uPosTexture;
   uniform float uIsGpuActive;
   uniform float uTime;
+  uniform float uLivingTime;
   uniform float uFormationTime;
-  uniform float uScrollProgress;
   uniform vec3 uPointer;
   uniform float uPointerRadius;
 
@@ -153,6 +208,7 @@ const renderVertexShader = `
   attribute float aSize;
   attribute float aFlowOrder;
   attribute float aSpineProg;
+  attribute float aIsLime;
 
   varying vec3 vColor;
   varying float vAlpha;
@@ -164,8 +220,8 @@ const renderVertexShader = `
       vec4 simData = texture2D(uPosTexture, aSimUv);
       pos = simData.xyz;
     } else {
-      // Direct vertex fallback: progressive formation + wind displacement
-      float formProg = clamp((uFormationTime - 0.25 - aFlowOrder * 0.75) / 1.15, 0.0, 1.0);
+      // Fallback: smooth monotonic formation interpolation
+      float formProg = clamp((uFormationTime - 0.20 - aFlowOrder * 0.90) / 1.10, 0.0, 1.0);
       pos = mix(aInitialPos, aTargetPos, smoothstep(0.0, 1.0, formProg));
 
       vec3 toPointer = pos - uPointer;
@@ -179,19 +235,18 @@ const renderVertexShader = `
     vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
     gl_Position = projectionMatrix * mvPosition;
 
-    // Strict point size clamping: 1.0 to 2.4px (clean, crisp, no huge bokeh circles)
+    // Crisp perspective point size: strictly 1.0 to 2.5px maximum
     gl_PointSize = clamp(aSize * (24.0 / -mvPosition.z), 1.0, 2.6);
 
-    // Acid Lime Signal Pulse: travels softly from tail -> body -> wing -> tip every 3.8 seconds
-    float pulseTime = mod(uTime, 3.8);
-    float pulsePos = pulseTime / 2.4; // Travels 0.0 -> 1.0 across 2.4s, rests for 1.4s
-    float pulseDist = abs(aSpineProg - pulsePos);
-    float pulseGlow = smoothstep(0.12, 0.0, pulseDist) * 0.75;
-
-    // Apply color with signal pulse
+    // Rare Lime Signal Pulse: travels tail -> body -> wing -> tip every 5.2 seconds
+    // Only affects rare lime particles (never recolors ordinary ivory particles)
     vec3 col = aColor;
-    if (pulseGlow > 0.01) {
-      col = mix(col, vec3(0.81, 0.99, 0.09), pulseGlow);
+    if (aIsLime > 0.5) {
+      float cycleTime = mod(uLivingTime, 5.2);
+      float pulseWindow = cycleTime / 3.0; // travels across 3.0s, rests for 2.2s
+      float pulseDist = abs(aSpineProg - pulseWindow);
+      float pulseGlow = smoothstep(0.14, 0.0, pulseDist);
+      col = mix(col, vec3(0.81, 0.99, 0.09) * 1.25, pulseGlow * 0.85);
     }
 
     vColor = col;
@@ -207,8 +262,8 @@ const renderFragmentShader = `
     float dist = length(gl_PointCoord - vec2(0.5));
     if (dist > 0.5) discard;
 
-    // Soft, crisp circular point
-    float alpha = smoothstep(0.5, 0.18, dist) * vAlpha;
+    // Crisp circular point
+    float alpha = smoothstep(0.5, 0.20, dist) * vAlpha;
     gl_FragColor = vec4(vColor, alpha);
   }
 `;
@@ -216,10 +271,9 @@ const renderFragmentShader = `
 export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
   onReady,
   scrollProgress = 0,
-  formationTime = 0,
 }) => {
   const { gl, camera } = useThree();
-  const { inputsRef, qualityLevel } = useExperience();
+  const { inputsRef, qualityLevel, introPhase } = useExperience();
 
   const tierConfig = HERO_TIERS[qualityLevel] || HERO_TIERS.MEDIUM;
   const simSize = tierConfig.simSize;
@@ -230,6 +284,17 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
   const posVarRef = useRef<any>(null);
   const velVarRef = useRef<any>(null);
   const isGpuActiveRef = useRef<boolean>(false);
+
+  // Store onReady in ref to decouple from GPU recreation
+  const onReadyRef = useRef(onReady);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
+
+  // Monotonic Formation & Living Timers (Strictly Persist Across Rerenders)
+  const formationTimeRef = useRef(0);
+  const formationCompletedRef = useRef(false);
+  const livingTimeRef = useRef(0);
 
   // 1. Sample deterministic particles from the 3D swift
   const { particles } = useMemo(() => {
@@ -244,7 +309,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
   const trailAges = useMemo(() => new Float32Array(MAX_TRAIL).fill(999), []);
   const lastPointer = useMemo(() => new THREE.Vector3(999, 999, 999), []);
 
-  // 3. Initialize GPGPU Computation Renderer
+  // 3. Initialize GPGPU Computation Renderer (Zero Callback Dependencies)
   useEffect(() => {
     try {
       const gpuCompute = new GPUComputationRenderer(simSize, simSize, gl);
@@ -267,7 +332,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
         const pt = particles[i];
         const idx = i * 4;
 
-        // Position starts in sparse field for Act 1
+        // Position starts in sparse field for State 1
         posArray[idx + 0] = pt.initialPos.x;
         posArray[idx + 1] = pt.initialPos.y;
         posArray[idx + 2] = pt.initialPos.z;
@@ -284,10 +349,10 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
         origArray[idx + 2] = pt.targetPos.z;
         origArray[idx + 3] = pt.flowOrder;
 
-        // Static Initial & Zone texture
-        metaArray[idx + 0] = pt.initialPos.x;
-        metaArray[idx + 1] = pt.initialPos.y;
-        metaArray[idx + 2] = pt.initialPos.z;
+        // Static Metadata texture: x=spanNorm, y=chordNorm, z=edgeType, w=zoneId
+        metaArray[idx + 0] = pt.spanNorm;
+        metaArray[idx + 1] = pt.chordNorm;
+        metaArray[idx + 2] = pt.edgeType;
         metaArray[idx + 3] = pt.zoneId;
       }
 
@@ -301,12 +366,13 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
       velVariable.material.uniforms.uTime = { value: 0 };
       velVariable.material.uniforms.uDelta = { value: 0.016 };
       velVariable.material.uniforms.uFormationTime = { value: 0 };
+      velVariable.material.uniforms.uLivingTime = { value: 0 };
       velVariable.material.uniforms.uScrollProgress = { value: 0 };
       velVariable.material.uniforms.uPointer = { value: new THREE.Vector3(999, 999, 999) };
       velVariable.material.uniforms.uPointerVel = { value: new THREE.Vector2(0, 0) };
       velVariable.material.uniforms.uPointerSpeed = { value: 0 };
       velVariable.material.uniforms.uPointerRadius = { value: 1.25 };
-      velVariable.material.uniforms.uReturnStrength = { value: 4.5 };
+      velVariable.material.uniforms.uReturnStrength = { value: 4.8 };
       velVariable.material.uniforms.uDamping = { value: 0.88 };
       velVariable.material.uniforms.uOriginTexture = { value: dtOrigin };
       velVariable.material.uniforms.uMetaTexture = { value: dtMeta };
@@ -319,7 +385,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
 
       const error = gpuCompute.init();
       if (error !== null) {
-        console.warn('GPGPU initialization fallback to direct vertex shader:', error);
+        console.warn('GPGPU initialization fallback:', error);
         isGpuActiveRef.current = false;
       } else {
         gpuComputeRef.current = gpuCompute;
@@ -328,18 +394,18 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
         isGpuActiveRef.current = true;
       }
     } catch (err) {
-      console.warn('GPGPU error, fallback cleanly:', err);
+      console.warn('GPGPU error:', err);
       isGpuActiveRef.current = false;
     }
 
-    onReady?.();
+    onReadyRef.current?.();
 
     return () => {
       gpuComputeRef.current = null;
       posVarRef.current = null;
       velVarRef.current = null;
     };
-  }, [gl, simSize, totalCount, particles, onReady, trailPositions, trailVelocities, trailAges]);
+  }, [gl, simSize, totalCount, particles]);
 
   // 4. Render Geometry & Shader Buffers
   const { geometry, uniforms } = useMemo(() => {
@@ -352,6 +418,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
     const sizes = new Float32Array(totalCount);
     const flowOrders = new Float32Array(totalCount);
     const spineProgs = new Float32Array(totalCount);
+    const isLimes = new Float32Array(totalCount);
 
     for (let i = 0; i < totalCount; i++) {
       const x = (i % simSize) / simSize;
@@ -375,6 +442,9 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
       sizes[i] = pt.size;
       flowOrders[i] = pt.flowOrder;
       spineProgs[i] = pt.spineProg;
+
+      // Check if lime (r > 0.7, g > 0.9, b < 0.2)
+      isLimes[i] = (pt.color.g > 0.9 && pt.color.b < 0.2) ? 1.0 : 0.0;
     }
 
     geom.setAttribute('aSimUv', new THREE.BufferAttribute(uvs, 2));
@@ -384,6 +454,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
     geom.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
     geom.setAttribute('aFlowOrder', new THREE.BufferAttribute(flowOrders, 1));
     geom.setAttribute('aSpineProg', new THREE.BufferAttribute(spineProgs, 1));
+    geom.setAttribute('aIsLime', new THREE.BufferAttribute(isLimes, 1));
 
     // Dummy position attribute for Three.js bounding box
     geom.setAttribute('position', new THREE.BufferAttribute(targetPositions, 3));
@@ -393,7 +464,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
       uIsGpuActive: { value: 0 },
       uTime: { value: 0 },
       uFormationTime: { value: 0 },
-      uScrollProgress: { value: 0 },
+      uLivingTime: { value: 0 },
       uPointer: { value: new THREE.Vector3(999, 999, 999) },
       uPointerRadius: { value: 1.25 },
     };
@@ -408,7 +479,7 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
       uniforms,
       transparent: true,
       depthWrite: false,
-      blending: THREE.NormalBlending, // NormalBlending guarantees no milky white wash
+      blending: THREE.NormalBlending,
     });
   }, [uniforms]);
 
@@ -420,7 +491,20 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
     const t = state.clock.getElapsedTime();
     const dt = Math.min(delta, 0.033);
 
-    // Unproject pointer into interaction plane at Z = 0
+    // 1. Advance Formation Monotonically (Never Resets)
+    if (introPhase !== 'loading' && introPhase !== 'tension') {
+      formationTimeRef.current += dt;
+      if (formationTimeRef.current >= 2.5) {
+        formationCompletedRef.current = true;
+      }
+    }
+
+    // 2. Advance Permanent Living-Motion Clock continuously
+    if (formationCompletedRef.current) {
+      livingTimeRef.current += dt;
+    }
+
+    // 3. Unproject pointer into interaction plane at Z = 0
     const pX = inputs?.pointerX || 0;
     const pY = inputs?.pointerY || 0;
 
@@ -432,10 +516,9 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
 
     pointerWorldPos.set(pX * halfWidth, pY * halfHeight, planeZ);
 
-    // Update cursor wind wake trail memory
+    // 4. Update cursor wind wake trail memory
     const pointerMoved = pointerWorldPos.distanceTo(lastPointer) > 0.02;
     if (pointerMoved) {
-      // Shift trail points
       for (let i = MAX_TRAIL - 1; i > 0; i--) {
         trailPositions[i].copy(trailPositions[i - 1]);
         trailVelocities[i].copy(trailVelocities[i - 1]);
@@ -447,18 +530,19 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
       lastPointer.copy(pointerWorldPos);
     }
 
-    // Age trail points
     for (let i = 0; i < MAX_TRAIL; i++) {
       trailAges[i] += dt;
     }
 
+    // 5. Execute GPGPU Simulation Frame
     if (isGpuActiveRef.current && gpuComputeRef.current && velVarRef.current && posVarRef.current) {
       const velUni = velVarRef.current.material.uniforms;
       const posUni = posVarRef.current.material.uniforms;
 
       velUni.uTime.value = t;
       velUni.uDelta.value = dt;
-      velUni.uFormationTime.value = formationTime;
+      velUni.uFormationTime.value = formationTimeRef.current;
+      velUni.uLivingTime.value = livingTimeRef.current;
       velUni.uScrollProgress.value = scrollProgress;
       velUni.uPointer.value.copy(pointerWorldPos);
       velUni.uPointerVel.value.set(inputs?.pointerVelX || 0, inputs?.pointerVelY || 0);
@@ -476,8 +560,8 @@ export const HeroParticleBird: React.FC<HeroParticleBirdProps> = ({
     }
 
     material.uniforms.uTime.value = t;
-    material.uniforms.uFormationTime.value = formationTime;
-    material.uniforms.uScrollProgress.value = scrollProgress;
+    material.uniforms.uFormationTime.value = formationTimeRef.current;
+    material.uniforms.uLivingTime.value = livingTimeRef.current;
     material.uniforms.uPointer.value.copy(pointerWorldPos);
   });
 

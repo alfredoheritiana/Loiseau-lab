@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useExperience } from '../../context/ExperienceContext';
@@ -24,7 +24,7 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
   onSimulationReady,
   onGhostCoreReady,
 }) => {
-  const { qualityLevel, setQualityLevel, inputsRef, introPhase } = useExperience();
+  const { qualityLevel, setQualityLevel, inputsRef } = useExperience();
   const { gl, scene, camera } = useThree();
 
   const groupRef = useRef<THREE.Group>(null);
@@ -32,17 +32,32 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
   const warmupTimes = useRef<number[]>([]);
   const warmupFinished = useRef(false);
 
-  // Formation timer (starts when loader transition opens / introPhase reaches opening/expanding/settling/ready)
-  const formationTimeRef = useRef(0);
-  const [formationTime, setFormationTime] = useState(0);
+  // Store readiness callbacks in refs so they NEVER trigger re-renders or effect re-runs
+  const callbacksRef = useRef({
+    onShadersReady,
+    onWarmupReady,
+    onGeometryReady,
+    onSimulationReady,
+    onGhostCoreReady,
+  });
 
-  // 1. Mark geometry and ghost core ready upon mounting
   useEffect(() => {
-    onGeometryReady?.();
-    onGhostCoreReady?.();
-  }, [onGeometryReady, onGhostCoreReady]);
+    callbacksRef.current = {
+      onShadersReady,
+      onWarmupReady,
+      onGeometryReady,
+      onSimulationReady,
+      onGhostCoreReady,
+    };
+  });
 
-  // 2. Asynchronous Shader Precompilation
+  // 1. Mark geometry and ghost core ready once on mount
+  useEffect(() => {
+    callbacksRef.current.onGeometryReady?.();
+    callbacksRef.current.onGhostCoreReady?.();
+  }, []);
+
+  // 2. Asynchronous Shader Precompilation (Once on mount)
   useEffect(() => {
     let active = true;
 
@@ -55,11 +70,11 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
           renderer.compile(scene, camera);
         }
         if (active) {
-          onShadersReady?.();
+          callbacksRef.current.onShadersReady?.();
         }
       } catch (err) {
         console.warn('compileAsync fallback:', err);
-        if (active) onShadersReady?.();
+        if (active) callbacksRef.current.onShadersReady?.();
       }
     };
 
@@ -68,7 +83,7 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       active = false;
       clearTimeout(timer);
     };
-  }, [gl, scene, camera, onShadersReady]);
+  }, [gl, scene, camera]);
 
   // 3. First-frame Warmup Profiling (10 actual frames)
   useFrame((state, delta) => {
@@ -90,20 +105,12 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
         setQualityLevel('LOW', false);
       }
 
-      onWarmupReady?.();
+      callbacksRef.current.onWarmupReady?.();
     }
   });
 
-  // 4. Update formation timer and scroll progression
-  useFrame((state, delta) => {
-    const dt = Math.min(delta, 0.033);
-
-    // Increment formation timer once aperture begins opening
-    if (introPhase !== 'loading' && introPhase !== 'tension') {
-      formationTimeRef.current += dt;
-      setFormationTime(formationTimeRef.current);
-    }
-
+  // 4. Scroll progression (Updates transform directly, NO React state)
+  useFrame(() => {
     if (!groupRef.current) return;
     const heroScroll = inputsRef.current?.sceneProgress.hero || progress || 0;
 
@@ -119,22 +126,18 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
 
   const heroScroll = inputsRef.current?.sceneProgress.hero || progress || 0;
 
-  // Ghost core opacity emerges during Act 3 & 4 (max 0.08)
-  const ghostOpacity = Math.max(0, Math.min(0.08, (formationTime - 0.8) * 0.06));
-
   return (
     <group ref={groupRef} name="hero-murmuration-swift-experience">
       {/* Studio Lighting Environment against #080808 */}
       <HeroLighting />
 
       {/* Subtle Ghost-Core Mesh Underneath (~5–8% visual presence) */}
-      <HeroGhostCore opacity={ghostOpacity} />
+      <HeroGhostCore opacity={0.07} />
 
       {/* The Murmuration Swift: Large GPGPU Particle Bird */}
       <HeroParticleBird
         onReady={onSimulationReady}
         scrollProgress={heroScroll}
-        formationTime={formationTime}
       />
 
       {/* Postprocessing: Contact N8AO, High-Threshold Bloom & ACES Filmic */}
