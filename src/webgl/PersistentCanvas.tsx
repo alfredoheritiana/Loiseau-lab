@@ -113,9 +113,9 @@ export const PersistentCanvas: React.FC = () => {
   const isFinalScene = activeScene === 'scene-17-final';
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#080808]" aria-hidden="true">
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 50, near: 0.1, far: 250 }}
+        camera={{ position: [0, 0, 5.2], fov: 45, near: 0.1, far: 250 }}
         dpr={dpr as any}
         gl={{
           antialias: qualityLevel !== 'LOW',
@@ -125,23 +125,12 @@ export const PersistentCanvas: React.FC = () => {
         }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
-          gl.toneMappingExposure = 1.1;
+          gl.toneMappingExposure = 0.88;
         }}
       >
+        <color attach="background" args={['#080808']} />
         <Suspense fallback={null}>
           <SceneCameraCoordinator />
-
-          {/* Precision Studio Lighting */}
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            position={[5, 8, 6]}
-            intensity={1.2}
-            castShadow
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
-          />
-          <pointLight position={[-4, -2, 3]} color="#CFFE16" intensity={0.6} distance={15} />
-          <pointLight position={[4, 2, -5]} color="#2140FF" intensity={0.8} distance={20} />
 
           {/* SCENE 02 & 03: Persistent Hero Physical Objects & Shared Element Window */}
           <PersistentHeroWindow progress={inputsRef.current?.sceneProgress.hero || 0} />

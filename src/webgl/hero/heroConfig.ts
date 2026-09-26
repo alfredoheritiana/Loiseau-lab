@@ -12,27 +12,27 @@ export interface TierConfig {
 
 export const HERO_TIERS: Record<QualityLevel, TierConfig> = {
   HIGH: {
-    nodeCount: 22,
-    connectorCount: 12,
-    particleCount: 950,
+    nodeCount: 20,       // 18–22 nodes
+    connectorCount: 11,   // 10–12 connectors
+    particleCount: 650,   // 500–800 sparse micro-points
     fluidProfile: 'balanced',
     enableAO: true,
     enableTransmission: true,
-    dprMax: 1.8,
+    dprMax: 1.75,
   },
   MEDIUM: {
-    nodeCount: 16,
-    connectorCount: 8,
-    particleCount: 450,
+    nodeCount: 14,       // 13–16 nodes
+    connectorCount: 8,    // 7–9 connectors
+    particleCount: 350,   // 250–450 particles
     fluidProfile: 'performance',
     enableAO: true,
     enableTransmission: false,
     dprMax: 1.25,
   },
   LOW: {
-    nodeCount: 10,
-    connectorCount: 5,
-    particleCount: 120,
+    nodeCount: 9,        // 8–10 nodes
+    connectorCount: 5,    // 4–6 connectors
+    particleCount: 100,   // 0–150 particles
     fluidProfile: 'off',
     enableAO: false,
     enableTransmission: false,
@@ -50,11 +50,23 @@ export const HERO_TIERS: Record<QualityLevel, TierConfig> = {
 };
 
 export const HERO_COLORS = {
-  GRAPHITE_DARK: '#0F120E',
-  GRAPHITE_SURFACE: '#1C201A',
-  OFFWHITE_SATIN: '#ECEEE5',
+  // ~70% Dark Anodized Graphite / Smoked Ceramic
+  GRAPHITE_DARK: '#121411',
+  GRAPHITE_CORE: '#161914',
+  GRAPHITE_SURFACE: '#20241E',
+
+  // ~18% Off-White Satin / Silver Grey
+  OFFWHITE_SATIN: '#DCE0D5',
+  OFFWHITE_PURE: '#ECEEE5',
+
+  // ~8% Signal Lime (Restrained, high-value accents)
   SIGNAL_LIME: '#CFFE16',
-  LIME_EMISSIVE: '#A3E300',
-  CONNECTOR_BASE: 'rgba(236, 238, 229, 0.45)',
-  CONNECTOR_LIME: 'rgba(207, 254, 22, 0.85)',
+  LIME_EMISSIVE: '#7EBA00',
+
+  // ~4% Deep Translucent Accent
+  TRANSLUCENT_POD: '#1A2416',
+
+  // Connectors
+  CONNECTOR_NEUTRAL: '#8A8E85',
+  CONNECTOR_LIME: '#CFFE16',
 };

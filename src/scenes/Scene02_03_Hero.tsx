@@ -97,65 +97,48 @@ export const Scene02_03_Hero: React.FC = () => {
         </div>
 
         {/* Center Target Frame for Scene 03 Shared Element Transition & Loader Handoff */}
-        <div className="relative z-10 mx-auto my-auto w-[92vw] h-[62vh] sm:h-[68vh] lg:h-[72vh] max-w-[1440px] max-h-[760px] flex items-center justify-center">
+        <div className="relative z-10 mx-auto my-auto w-[92vw] h-[62vh] sm:h-[68vh] lg:h-[72vh] max-w-[1440px] max-h-[760px] flex items-center justify-center pointer-events-none">
           <div
             ref={sharedMediaFrameRef}
             data-hero-handoff-target="true"
-            className={`w-full h-full relative flex items-center justify-center transition-all duration-500 pointer-events-auto ${
+            className={`w-full h-full relative flex items-center justify-center transition-all duration-500 ${
               isBenchmark
-                ? 'border border-white/20 bg-white/[0.02]'
-                : 'border border-transparent'
+                ? 'border border-white/20 bg-white/[0.02] pointer-events-auto'
+                : 'border-0 bg-transparent pointer-events-none'
             }`}
           >
-            {/* Corner crosshairs: subtle in Presentation, prominent in Benchmark */}
-            <div
-              className={`absolute -top-2 -left-2 w-3.5 h-3.5 border-t-2 border-l-2 transition-all duration-300 ${
-                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
-              }`}
-            />
-            <div
-              className={`absolute -top-2 -right-2 w-3.5 h-3.5 border-t-2 border-r-2 transition-all duration-300 ${
-                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
-              }`}
-            />
-            <div
-              className={`absolute -bottom-2 -left-2 w-3.5 h-3.5 border-b-2 border-l-2 transition-all duration-300 ${
-                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
-              }`}
-            />
-            <div
-              className={`absolute -bottom-2 -right-2 w-3.5 h-3.5 border-b-2 border-r-2 transition-all duration-300 ${
-                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
-              }`}
-            />
-
-            {/* Benchmark-only metadata tags inside frame */}
+            {/* Corner crosshairs: ONLY visible in Benchmark Mode */}
             {isBenchmark && (
               <>
+                <div className="absolute -top-2 -left-2 w-3.5 h-3.5 border-t-2 border-l-2 border-[#CFFE16]" />
+                <div className="absolute -top-2 -right-2 w-3.5 h-3.5 border-t-2 border-r-2 border-[#CFFE16]" />
+                <div className="absolute -bottom-2 -left-2 w-3.5 h-3.5 border-b-2 border-l-2 border-[#CFFE16]" />
+                <div className="absolute -bottom-2 -right-2 w-3.5 h-3.5 border-b-2 border-r-2 border-[#CFFE16]" />
+
                 <div className="absolute top-3 left-3 text-[10px] font-utility-mono text-white/40 tracking-wider">
                   DOM/WEBGL SHARED BOUNDS
                 </div>
                 <div className="absolute bottom-3 right-3 text-[10px] font-utility-mono text-[#CFFE16] tracking-wider">
-                  [PHYSICAL REPULSION FIELD ACTIVE]
+                  [RAPIER KINETIC CONSTELLATION ACTIVE]
                 </div>
               </>
             )}
           </div>
         </div>
 
-        {/* Bottom Editorial Meta Information: Safely revealed from below without ANY accidental clipping */}
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 pb-4">
-          <div className="space-y-1">
+        {/* Bottom Editorial Meta Information: Solid off-white with pristine contrast */}
+        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 pb-6 px-1 sm:px-2">
+          <div className="space-y-1.5 max-w-4xl">
             <div
-              className={`text-[11px] font-utility-mono text-[#CFFE16] tracking-wider uppercase transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[120ms] ${
+              className={`text-[11px] font-utility-mono text-[#CFFE16] tracking-widest uppercase transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[120ms] ${
                 isHeroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
               }`}
             >
-              EDITORIAL BENCHMARK // KINETIC CONSTELLATION
+              LOISEAU LAB 00 // THE AERODYNAMIC CORE
             </div>
             <div className="overflow-hidden py-1">
               <h1
-                className={`text-4xl sm:text-6xl md:text-7xl lg:text-[clamp(3.8rem,7.2vw,7.8rem)] font-editorial-sans font-black tracking-tighter uppercase leading-[0.88] transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[200ms] ${
+                className={`text-5xl sm:text-7xl md:text-8xl lg:text-[clamp(4.5rem,7.5vw,9rem)] font-editorial-sans font-black text-[#ECEEE5] tracking-tighter uppercase leading-[0.85] select-none transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[200ms] ${
                   isHeroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                 }`}
               >
@@ -165,13 +148,13 @@ export const Scene02_03_Hero: React.FC = () => {
           </div>
 
           <div
-            className={`flex items-center gap-3 text-xs font-utility-mono text-white/50 transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[280ms] ${
+            className={`flex items-center gap-2.5 text-[11px] font-utility-mono text-white/40 tracking-wider transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[280ms] ${
               isHeroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
             }`}
           >
-            <span className="animate-pulse text-[#CFFE16]">●</span>
-            <span>SCROLL TO ADVANCE SEQUENCE</span>
-            <ArrowDown className="w-3.5 h-3.5 text-[#CFFE16] animate-bounce" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#CFFE16]" />
+            <span>SCROLL TO EXPLORE</span>
+            <ArrowDown className="w-3 h-3 text-[#CFFE16]/80 animate-bounce" />
           </div>
         </div>
       </div>

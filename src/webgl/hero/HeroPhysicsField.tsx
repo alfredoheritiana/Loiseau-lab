@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Physics, RigidBody, BallCollider, CapsuleCollider, RapierRigidBody } from '@react-three/rapier';
+import { Physics, RigidBody, BallCollider, RapierRigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import { useExperience } from '../../context/ExperienceContext';
 import { SeededNode, generateSeededLayout } from './seededLayout';
@@ -13,13 +13,11 @@ interface HeroPhysicsFieldProps {
   onPhysicsReady?: () => void;
 }
 
-// Single node component within the Rapier Physics world
 const PhysicalNodeItem: React.FC<{
   node: SeededNode;
   onRegisterBody: (id: number, body: RapierRigidBody) => void;
   onUnregisterBody: (id: number) => void;
-  scrollProgress: number;
-}> = ({ node, onRegisterBody, onUnregisterBody, scrollProgress }) => {
+}> = ({ node, onRegisterBody, onUnregisterBody }) => {
   const bodyRef = useRef<RapierRigidBody>(null);
 
   useEffect(() => {
@@ -29,46 +27,52 @@ const PhysicalNodeItem: React.FC<{
     return () => onUnregisterBody(node.id);
   }, [node.id, onRegisterBody, onUnregisterBody]);
 
-  // Geometries reused across node family
+  // 3 disciplined geometry families
   const geometry = useMemo(() => {
     switch (node.shapeType) {
-      case 0: // Rounded Capsule
-        return new THREE.CapsuleGeometry(node.radius * 0.7, node.length * 0.8, 8, 16);
-      case 1: // Soft Polyhedron (Dodecahedron)
-        return new THREE.DodecahedronGeometry(node.radius * 1.15, 0);
-      case 2: // Compressed Ellipsoid
-      default: {
-        const geom = new THREE.SphereGeometry(node.radius, 16, 16);
-        geom.scale(1.2, 0.75, 1.0);
+      case 0: {
+        // Family A: Rounded graphite block
+        return new THREE.BoxGeometry(node.width, node.height, node.depth);
+      }
+      case 1: {
+        // Family B: Off-white compressed ellipsoid
+        const geom = new THREE.SphereGeometry(node.radius * 1.1, 16, 16);
+        geom.scale(1.25, 0.75, 0.85);
         return geom;
       }
+      case 2:
+      default: {
+        // Family C: Small aerodynamic lime capsule
+        return new THREE.CapsuleGeometry(node.radius * 0.75, node.height * 0.85, 6, 12);
+      }
     }
-  }, [node.shapeType, node.radius, node.length]);
+  }, [node.shapeType, node.width, node.height, node.depth, node.radius]);
 
-  // Material selection based on node materialType
+  // Calibrated materials matching Section 40, 41, 42
   const material = useMemo(() => {
     if (node.materialType === 'lime') {
       return new THREE.MeshPhysicalMaterial({
         color: HERO_COLORS.SIGNAL_LIME,
         emissive: HERO_COLORS.LIME_EMISSIVE,
-        emissiveIntensity: 0.35,
-        metalness: 0.25,
-        roughness: 0.28,
+        emissiveIntensity: 0.22,
+        metalness: 0.28,
+        roughness: 0.22,
       });
     }
     if (node.materialType === 'offwhite') {
       return new THREE.MeshPhysicalMaterial({
         color: HERO_COLORS.OFFWHITE_SATIN,
-        metalness: 0.15,
-        roughness: 0.38,
-        clearcoat: 0.2,
+        metalness: 0.18,
+        roughness: 0.36,
+        clearcoat: 0.25,
       });
     }
     return new THREE.MeshPhysicalMaterial({
       color: HERO_COLORS.GRAPHITE_DARK,
-      metalness: 0.85,
-      roughness: 0.24,
-      clearcoat: 0.4,
+      metalness: 0.78,
+      roughness: 0.22,
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.12,
     });
   }, [node.materialType]);
 
@@ -76,10 +80,10 @@ const PhysicalNodeItem: React.FC<{
     <RigidBody
       ref={bodyRef}
       position={[node.initialPos.x, node.initialPos.y, node.initialPos.z]}
-      colliders={node.shapeType === 0 ? 'hull' : 'ball'}
-      linearDamping={3.8}
-      angularDamping={3.5}
-      restitution={0.25}
+      colliders="ball"
+      linearDamping={4.5}
+      angularDamping={4.2}
+      restitution={0.18}
       mass={node.mass}
     >
       <mesh geometry={geometry} material={material} castShadow receiveShadow />
@@ -116,7 +120,7 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
     positionsMap.current.delete(id);
   };
 
-  // Reusable vectors for zero allocation in useFrame
+  // Pre-allocated vectors for useFrame (Zero allocation in hot loops)
   const tempTarget = useMemo(() => new THREE.Vector3(), []);
   const tempCurrent = useMemo(() => new THREE.Vector3(), []);
   const tempForce = useMemo(() => new THREE.Vector3(), []);
@@ -126,15 +130,12 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
     const inputs = inputsRef.current;
     const heroScroll = inputs?.sceneProgress.hero || 0;
 
-    // 1. Update Kinematic Pointer Collider
+    // 1. Update Kinematic Pointer Collider on Z = 0 plane
     if (pointerBodyRef.current) {
-      // Unproject pointer from NDC to Z=0 interaction plane
       const pX = inputs?.pointerX || 0;
       const pY = inputs?.pointerY || 0;
-      const vel = inputs?.pointerVel || 0;
 
-      // Interaction plane at Z=0.5
-      const planeZ = 0.5;
+      const planeZ = 0.0;
       const dist = camera.position.z - planeZ;
       const vFOV = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
       const halfHeight = Math.tan(vFOV / 2) * dist;
@@ -142,11 +143,10 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
 
       pointerTarget.set(pX * halfWidth, pY * halfHeight, planeZ);
 
-      // Smooth kinematic travel
       const curPointer = pointerBodyRef.current.translation();
-      const nextX = THREE.MathUtils.lerp(curPointer.x, pointerTarget.x, 0.25);
-      const nextY = THREE.MathUtils.lerp(curPointer.y, pointerTarget.y, 0.25);
-      const nextZ = THREE.MathUtils.lerp(curPointer.z, pointerTarget.z, 0.25);
+      const nextX = THREE.MathUtils.lerp(curPointer.x, pointerTarget.x, 0.22);
+      const nextY = THREE.MathUtils.lerp(curPointer.y, pointerTarget.y, 0.22);
+      const nextZ = THREE.MathUtils.lerp(curPointer.z, pointerTarget.z, 0.22);
 
       pointerBodyRef.current.setNextKinematicTranslation({
         x: nextX,
@@ -155,9 +155,9 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
       });
     }
 
-    // 2. Apply Damped Field Attraction toward Seeded Targets
-    const springK = 3.6; // field attraction stiffness
-    const scrollRetreatZ = -heroScroll * 2.2;
+    // 2. Viscous, heavily damped field attraction with strict depth containment
+    const springK = 4.2;
+    const scrollRetreatZ = -heroScroll * 1.8;
 
     for (const node of nodes) {
       const body = bodiesMap.current.get(node.id);
@@ -166,7 +166,12 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
       const trans = body.translation();
       tempCurrent.set(trans.x, trans.y, trans.z);
 
-      // Cache position for connectors
+      // Depth safety clamp: ensure node NEVER comes close to camera (z > 0.65)
+      if (trans.z > 0.65) {
+        body.setTranslation({ x: trans.x, y: trans.y, z: 0.65 }, true);
+      }
+
+      // Cache position for structural connectors
       let storedPos = positionsMap.current.get(node.id);
       if (!storedPos) {
         storedPos = new THREE.Vector3();
@@ -174,19 +179,22 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
       }
       storedPos.copy(tempCurrent);
 
-      // Target with scroll retreat
+      // Target with gentle scroll migration
       tempTarget.copy(node.targetPos);
       tempTarget.z += scrollRetreatZ;
 
-      // Force = (Target - Current) * K
+      // Restoring Force = (Target - Current) * K
       tempForce.subVectors(tempTarget, tempCurrent).multiplyScalar(springK * delta);
 
-      // Pointer impulse push when pointer is near
+      // Controlled pointer displacement with clamped impulse
       const distToPointer = tempCurrent.distanceTo(pointerTarget);
-      if (distToPointer < 1.4) {
+      if (distToPointer < 1.3) {
         const pushDir = tempCurrent.clone().sub(pointerTarget).normalize();
-        const pushStrength = (1.4 - distToPointer) * (1.2 + (inputs?.pointerVel || 0) * 0.4);
-        tempForce.add(pushDir.multiplyScalar(pushStrength * delta * 8.0));
+        const velocityMultiplier = Math.min(2.5, 1.0 + (inputs?.pointerVel || 0) * 0.35);
+        const dragMultiplier = inputs?.pointerDown ? 1.4 : 1.0;
+        const pushMagnitude = (1.3 - distToPointer) * 1.8 * velocityMultiplier * dragMultiplier;
+
+        tempForce.add(pushDir.multiplyScalar(pushMagnitude * delta * 5.0));
       }
 
       body.applyImpulse(
@@ -199,7 +207,6 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
       );
     }
 
-    // Expose positions to connectors
     onPositionsUpdate?.(positionsMap.current);
   });
 
@@ -207,7 +214,7 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
     <Physics gravity={[0, 0, 0]} colliders={false}>
       {/* Invisible Kinematic Pointer Collider */}
       <RigidBody ref={pointerBodyRef} type="kinematicPosition" colliders={false}>
-        <BallCollider args={[0.55]} />
+        <BallCollider args={[0.48]} />
       </RigidBody>
 
       {/* Seeded Physical Node Bodies */}
@@ -217,7 +224,6 @@ export const HeroPhysicsField: React.FC<HeroPhysicsFieldProps> = ({
           node={node}
           onRegisterBody={handleRegisterBody}
           onUnregisterBody={handleUnregisterBody}
-          scrollProgress={inputsRef.current?.sceneProgress.hero || 0}
         />
       ))}
     </Physics>
