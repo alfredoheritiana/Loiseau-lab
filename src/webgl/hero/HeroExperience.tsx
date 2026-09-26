@@ -1,46 +1,45 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useExperience } from '../../context/ExperienceContext';
 import { HERO_TIERS } from './heroConfig';
 import { HeroLighting } from './HeroLighting';
-import { HeroCore } from './HeroCore';
-import { HeroPhysicsField } from './HeroPhysicsField';
-import { HeroConnectors } from './HeroConnectors';
-import { HeroFluidSystem } from './HeroFluidSystem';
-import { HeroFlowParticles } from './HeroFlowParticles';
+import { HeroGhostCore } from './HeroGhostCore';
+import { HeroParticleSculpture } from './HeroParticleSculpture';
 import { HeroPostFX } from './HeroPostFX';
 
 interface HeroExperienceProps {
   progress?: number;
   onShadersReady?: () => void;
   onWarmupReady?: () => void;
-  onPhysicsReady?: () => void;
-  onFluidReady?: () => void;
+  onGeometryReady?: () => void;
+  onSimulationReady?: () => void;
+  onGhostCoreReady?: () => void;
 }
 
 export const HeroExperience: React.FC<HeroExperienceProps> = ({
   progress = 0,
   onShadersReady,
   onWarmupReady,
-  onPhysicsReady,
-  onFluidReady,
+  onGeometryReady,
+  onSimulationReady,
+  onGhostCoreReady,
 }) => {
   const { qualityLevel, setQualityLevel, inputsRef } = useExperience();
   const { gl, scene, camera } = useThree();
 
-  const tierConfig = HERO_TIERS[qualityLevel] || HERO_TIERS.MEDIUM;
-
-  const corePosRef = useRef(new THREE.Vector3(0.55, 0.35, 0));
-  const nodePositionsRef = useRef<Map<number, THREE.Vector3>>(new Map());
-  const [velocityTexture, setVelocityTexture] = useState<any>(null);
-
-  // Warmup tracking
+  const groupRef = useRef<THREE.Group>(null);
   const warmupFrameCount = useRef(0);
   const warmupTimes = useRef<number[]>([]);
   const warmupFinished = useRef(false);
 
-  // 1. Asynchronous Shader Precompilation
+  // 1. Mark geometry and ghost core ready upon mounting
+  useEffect(() => {
+    onGeometryReady?.();
+    onGhostCoreReady?.();
+  }, [onGeometryReady, onGhostCoreReady]);
+
+  // 2. Asynchronous Shader Precompilation
   useEffect(() => {
     let active = true;
 
@@ -61,15 +60,14 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       }
     };
 
-    // Delay slightly to ensure children nodes are mounted
-    const timer = setTimeout(compileHeroShaders, 80);
+    const timer = setTimeout(compileHeroShaders, 60);
     return () => {
       active = false;
       clearTimeout(timer);
     };
   }, [gl, scene, camera, onShadersReady]);
 
-  // 2. First-frame Warmup Profiling (8-12 actual frames)
+  // 3. First-frame Warmup Profiling (10 actual frames)
   useFrame((state, delta) => {
     if (warmupFinished.current) return;
 
@@ -82,7 +80,7 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
       const sum = warmupTimes.current.reduce((a, b) => a + b, 0);
       const avgMs = sum / warmupTimes.current.length;
 
-      // Auto-downgrade if first frames are too heavy
+      // Safe automatic tier adaptation if initial frame cost is too high
       if (avgMs > 28 && qualityLevel === 'HIGH') {
         setQualityLevel('MEDIUM', false);
       } else if (avgMs > 34 && qualityLevel === 'MEDIUM') {
@@ -93,54 +91,36 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
     }
   });
 
-  const handleCorePosition = (pos: THREE.Vector3) => {
-    corePosRef.current.copy(pos);
-  };
+  // 4. Subtle camera / cluster evolution across the 220vh scroll range
+  useFrame(() => {
+    if (!groupRef.current) return;
+    const heroScroll = inputsRef.current?.sceneProgress.hero || progress || 0;
 
-  const handleNodePositions = (map: Map<number, THREE.Vector3>) => {
-    nodePositionsRef.current = map;
-  };
+    // First 35%: primary poster state
+    // 35% - 65%: gentle depth migration and slight core reorientation
+    // 65% - 100%: smooth exit
+    const zOffset = -heroScroll * 1.6;
+    const rotY = heroScroll * 0.25;
+
+    groupRef.current.position.z = zOffset;
+    groupRef.current.rotation.y = rotY;
+  });
 
   return (
-    <group name="hero-kinetic-constellation">
-      {/* Studio Lighting Environment */}
+    <group ref={groupRef} name="hero-particle-sculpture-experience">
+      {/* Studio Lighting Environment against #080808 */}
       <HeroLighting />
 
-      {/* Central Aerodynamic Core */}
-      <HeroCore
+      {/* Subtle Ghost-Core Mesh Underneath (~8–15% visual presence) */}
+      <HeroGhostCore scrollProgress={progress} />
+
+      {/* Dense GPGPU Particle Sculpture */}
+      <HeroParticleSculpture
+        onReady={onSimulationReady}
         scrollProgress={progress}
-        onPositionUpdate={handleCorePosition}
       />
 
-      {/* Rapier Physics Node Field */}
-      <HeroPhysicsField
-        nodeCount={tierConfig.nodeCount}
-        corePosition={corePosRef.current}
-        onPositionsUpdate={handleNodePositions}
-        onPhysicsReady={onPhysicsReady}
-      />
-
-      {/* Reusable Structural Connectors */}
-      <HeroConnectors
-        connectorCount={tierConfig.connectorCount}
-        corePosition={corePosRef.current}
-        nodePositionsRef={nodePositionsRef}
-      />
-
-      {/* Fluid Simulation System */}
-      <HeroFluidSystem
-        profile={tierConfig.fluidProfile}
-        onFluidReady={onFluidReady}
-        onFluidUpdate={setVelocityTexture}
-      />
-
-      {/* GPU Atmospheric Flow Particles */}
-      <HeroFlowParticles
-        count={tierConfig.particleCount}
-        velocityTexture={velocityTexture}
-      />
-
-      {/* Contact AO, Selective Bloom & ACES Filmic Tone Mapping */}
+      {/* Postprocessing: Contact N8AO, High-Threshold Bloom & ACES Filmic */}
       <HeroPostFX qualityLevel={qualityLevel} />
     </group>
   );

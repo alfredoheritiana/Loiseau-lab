@@ -13,25 +13,21 @@ interface PersistentHeroWindowProps {
  * Reports real subsystem readiness to ExperienceContext / Loader.
  */
 export const PersistentHeroWindow: React.FC<PersistentHeroWindowProps> = ({ progress = 0 }) => {
-  const { inputsRef, setReadinessStage, qualityLevel } = useExperience();
+  const { inputsRef, setReadinessStage } = useExperience();
 
   const heroProgress = progress || inputsRef.current?.sceneProgress.hero || 0;
 
   useEffect(() => {
-    setReadinessStage('heroModulePhysics', true);
-    setReadinessStage('heroEnvironment', true);
-
-    if (qualityLevel === 'LOW' || qualityLevel === 'STATIC') {
-      setReadinessStage('fluidReady', true);
-    }
-  }, [setReadinessStage, qualityLevel]);
+    setReadinessStage('heroModule', true);
+  }, [setReadinessStage]);
 
   return (
     <group name={CANVAS_IDS.HERO_WINDOW} userData={{ id: CANVAS_IDS.HERO_WINDOW }}>
       <HeroPhysicalSystem
         progress={heroProgress}
-        onPhysicsReady={() => setReadinessStage('rapierReady', true)}
-        onFluidReady={() => setReadinessStage('fluidReady', true)}
+        onGeometryReady={() => setReadinessStage('sourceGeometryReady', true)}
+        onSimulationReady={() => setReadinessStage('particleSimulationReady', true)}
+        onGhostCoreReady={() => setReadinessStage('ghostCoreReady', true)}
         onShadersReady={() => setReadinessStage('shaderCompileReady', true)}
         onWarmupReady={() => setReadinessStage('warmupReady', true)}
       />

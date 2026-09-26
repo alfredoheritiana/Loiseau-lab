@@ -152,10 +152,10 @@ export const ExperienceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [readiness, setReadiness] = useState<ReadinessStages>({
     baseFontsDom: false,
-    heroModulePhysics: false,
-    heroEnvironment: false,
-    rapierReady: false,
-    fluidReady: false,
+    heroModule: false,
+    sourceGeometryReady: false,
+    particleSimulationReady: false,
+    ghostCoreReady: false,
     shaderCompileReady: false,
     warmupReady: false,
   });

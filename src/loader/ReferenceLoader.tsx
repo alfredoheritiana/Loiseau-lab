@@ -340,19 +340,19 @@ export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({ onComplete }) 
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[10px] font-utility-mono text-[#080808]/80">
               <span className={readiness.baseFontsDom ? 'font-bold' : 'opacity-40'}>
-                {readiness.baseFontsDom ? '✓' : '○'} BASE/FONTS
+                {readiness.baseFontsDom ? '✓' : '○'} FONTS/DOM
               </span>
               <span>·</span>
-              <span className={readiness.heroModulePhysics ? 'font-bold' : 'opacity-40'}>
-                {readiness.heroModulePhysics ? '✓' : '○'} MODULES
+              <span className={readiness.heroModule ? 'font-bold' : 'opacity-40'}>
+                {readiness.heroModule ? '✓' : '○'} MODULES
               </span>
               <span>·</span>
-              <span className={readiness.rapierReady ? 'font-bold' : 'opacity-40'}>
-                {readiness.rapierReady ? '✓' : '○'} RAPIER
+              <span className={readiness.sourceGeometryReady ? 'font-bold' : 'opacity-40'}>
+                {readiness.sourceGeometryReady ? '✓' : '○'} GEOMETRY
               </span>
               <span>·</span>
-              <span className={readiness.fluidReady ? 'font-bold' : 'opacity-40'}>
-                {readiness.fluidReady ? '✓' : '○'} FLUID
+              <span className={readiness.particleSimulationReady ? 'font-bold' : 'opacity-40'}>
+                {readiness.particleSimulationReady ? '✓' : '○'} PARTICLES
               </span>
               <span>·</span>
               <span className={readiness.shaderCompileReady ? 'font-bold' : 'opacity-40'}>
