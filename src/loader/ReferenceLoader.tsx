@@ -1,92 +1,79 @@
-import React, { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import gsap from 'gsap';
-import { Flip } from 'gsap/Flip';
 import { useExperience } from '../context/ExperienceContext';
+import { calculateRealProgress } from './readinessStore';
 import { LoaderFrame } from './LoaderFrame';
-import { LoaderState } from './loaderStore';
-
-gsap.registerPlugin(Flip);
 
 interface ReferenceLoaderProps {
-  onHandoffStart?: () => void;
   onComplete: () => void;
 }
 
-export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({
-  onHandoffStart,
-  onComplete,
-}) => {
-  const { reducedMotion, appMode, setIntroPhase } = useExperience();
+export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({ onComplete }) => {
+  const { readiness, setReadinessStage, reducedMotion, setIntroPhase, qualityLevel } = useExperience();
 
-  const [state, setState] = useState<LoaderState>('BOOT');
-  const [realProgress, setRealProgress] = useState(14);
+  const realProgress = calculateRealProgress(readiness);
   const [displayProgress, setDisplayProgress] = useState(0);
-  const [isHeroLayout, setIsHeroLayout] = useState(false);
-
-  // Asset verification tracking
-  const [readinessStages, setReadinessStages] = useState({
-    fonts: false,
-    webgl: false,
-    shaders: false,
-    dom: false,
-  });
+  const [isHandoff, setIsHandoff] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
 
   const animFrameRef = useRef<number | null>(null);
-  const flipStateRef = useRef<Flip.FlipState | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const limeTopRef = useRef<HTMLDivElement>(null);
-  const limeBottomRef = useRef<HTMLDivElement>(null);
-  const limeLeftRef = useRef<HTMLDivElement>(null);
-  const limeRightRef = useRef<HTMLDivElement>(null);
+  const handoffStartedRef = useRef(false);
+
+  // DOM and SVG element refs
+  const loaderFrameRef = useRef<HTMLDivElement>(null);
+  const apertureRef = useRef<SVGRectElement>(null);
   const topBarRef = useRef<HTMLDivElement>(null);
   const bottomBarRef = useRef<HTMLDivElement>(null);
 
-  // 1. Truthful Critical Asset Loading Pipeline
+  // Initial aperture rect coordinates (centered)
+  const [initialAperture, setInitialAperture] = useState(() => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1440;
+    const h = typeof window !== 'undefined' ? window.innerHeight : 900;
+    const frameW = Math.min(w * 0.88, 480);
+    const frameH = w >= 640 ? 340 : 300;
+    return {
+      x: (w - frameW) / 2,
+      y: (h - frameH) / 2,
+      width: frameW,
+      height: frameH,
+    };
+  });
+
+  // Measure initial DOM rect once LoaderFrame mounts
   useEffect(() => {
-    setState('LOADING');
+    if (loaderFrameRef.current) {
+      const rect = loaderFrameRef.current.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        setInitialAperture({
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    }
+  }, []);
+
+  // 1. Base fonts & DOM readiness trigger
+  useEffect(() => {
     setIntroPhase('loading');
 
-    const verifyCriticalAssets = async () => {
-      // Step A: Typography & Fonts
+    const verifyBase = async () => {
       if (document.fonts) {
         await document.fonts.ready;
       }
-      setReadinessStages((prev) => ({ ...prev, fonts: true }));
-      setRealProgress(42);
-
-      // Step B: WebGL 2.0 Context & Hardware Capability
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-      if (gl) {
-        setReadinessStages((prev) => ({ ...prev, webgl: true }));
-        setRealProgress(74);
-      }
-
-      // Step C: High-float Shader Precision
-      if (gl) {
-        const precision = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
-        if (precision && precision.precision > 0) {
-          setReadinessStages((prev) => ({ ...prev, shaders: true }));
-          setRealProgress(92);
-        }
-      }
-
-      // Step D: DOM Viewport & Metrics
-      if (typeof window !== 'undefined' && window.innerWidth > 0) {
-        setReadinessStages((prev) => ({ ...prev, dom: true }));
-        setRealProgress(100);
-      }
+      setReadinessStage('baseFontsDom', true);
     };
 
-    verifyCriticalAssets();
-  }, [setIntroPhase]);
+    verifyBase();
+  }, [setIntroPhase, setReadinessStage]);
 
-  // 2. High-Precision Display Progress Smoothing (Never reaches 100 before real readiness)
+  // 2. High-Precision Display Progress Smoothing (displayProgress <= realProgress)
   useEffect(() => {
     const tick = () => {
       setDisplayProgress((prev) => {
         if (prev < realProgress) {
-          const step = Math.max(1.4, (realProgress - prev) * 0.16);
+          const step = Math.max(1.2, (realProgress - prev) * 0.18);
           const next = Math.min(prev + step, realProgress);
           return parseFloat(next.toFixed(1));
         }
@@ -103,112 +90,76 @@ export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({
     };
   }, [realProgress]);
 
-  // 3. Tension and Aperture Preparation (90-98%)
+  // 3. Early Loading vs. Real 3D Reveal inside Frame (at ~88–92%)
   const innerRevealRatio =
-    displayProgress < 88
+    displayProgress < 86
       ? 0
-      : Math.min(1, (displayProgress - 88) / 10);
+      : Math.min(1, (displayProgress - 86) / 10);
 
-  // 4. Trigger Handoff immediately at 100% (Zero Hold State)
+  // 4. Master Handoff Timeline Trigger (at 100% real readiness)
   useEffect(() => {
-    if (realProgress >= 100 && displayProgress >= 99 && state === 'LOADING') {
-      setState('READY');
-      setIntroPhase('opening');
+    if (
+      realProgress >= 100 &&
+      displayProgress >= 99 &&
+      !handoffStartedRef.current &&
+      loaderFrameRef.current &&
+      apertureRef.current
+    ) {
+      handoffStartedRef.current = true;
+      setIsHandoff(true);
 
-      // Capture GSAP Flip state of the frame and corner markers before layout changes
-      flipStateRef.current = Flip.getState('[data-flip-id]', {
-        props: 'borderRadius,borderColor,backgroundColor,opacity',
-      });
+      const frameEl = loaderFrameRef.current;
+      const apertureEl = apertureRef.current;
 
-      // Switch to Hero layout
-      setState('HANDOFF');
-      setIntroPhase('expanding');
-      setIsHeroLayout(true);
-      onHandoffStart?.();
-    }
-  }, [realProgress, displayProgress, state, onHandoffStart, setIntroPhase]);
+      // Measure fromRect and toRect ONCE at handoff
+      const fromRect = frameEl.getBoundingClientRect();
+      const target = document.querySelector('[data-hero-handoff-target="true"]');
+      const toRect = target
+        ? target.getBoundingClientRect()
+        : {
+            left: (window.innerWidth - Math.min(window.innerWidth * 0.92, 1440)) / 2,
+            top: (window.innerHeight - Math.min(window.innerHeight * 0.72, 760)) / 2,
+            width: Math.min(window.innerWidth * 0.92, 1440),
+            height: Math.min(window.innerHeight * 0.72, 760),
+          };
 
-  // 5. Run GSAP Flip & Spatial Lime Displacement during HANDOFF
-  useLayoutEffect(() => {
-    if (state === 'HANDOFF' && flipStateRef.current) {
-      const duration = reducedMotion ? 0.35 : 1.45;
-
-      // Master Timeline for synchronized Flip and spatial lime panel displacement
-      const tl = gsap.timeline({
-        onComplete: () => {
-          setState('HERO');
-          setIntroPhase('ready');
-          onComplete();
+      // Set initial aperture attribute values explicitly to fromRect
+      gsap.set(apertureEl, {
+        attr: {
+          x: fromRect.left,
+          y: fromRect.top,
+          width: fromRect.width,
+          height: fromRect.height,
         },
       });
 
-      // A. GSAP Flip on Shared Frame and Corner Markers
-      tl.add(
-        Flip.from(flipStateRef.current, {
-          duration,
-          ease: 'power4.out',
-          targets: '[data-flip-id]',
-          nested: true,
-          absolute: true,
-        }),
-        0
-      );
+      // Fix LoaderFrame position to fromRect before animating geometry
+      gsap.set(frameEl, {
+        position: 'fixed',
+        left: fromRect.left,
+        top: fromRect.top,
+        width: fromRect.width,
+        height: fromRect.height,
+        margin: 0,
+        maxWidth: 'none',
+        maxHeight: 'none',
+        zIndex: 30,
+      });
 
-      // B. Spatial Displacement of Lime Shutter Panels (outward beyond viewport)
-      if (limeTopRef.current) {
-        tl.to(
-          limeTopRef.current,
-          {
-            yPercent: -105,
-            duration: duration * 0.9,
-            ease: 'power4.out',
-          },
-          0.05
-        );
-      }
-      if (limeBottomRef.current) {
-        tl.to(
-          limeBottomRef.current,
-          {
-            yPercent: 105,
-            duration: duration * 0.9,
-            ease: 'power4.out',
-          },
-          0.05
-        );
-      }
-      if (limeLeftRef.current) {
-        tl.to(
-          limeLeftRef.current,
-          {
-            xPercent: -105,
-            duration: duration * 0.9,
-            ease: 'power4.out',
-          },
-          0.05
-        );
-      }
-      if (limeRightRef.current) {
-        tl.to(
-          limeRightRef.current,
-          {
-            xPercent: 105,
-            duration: duration * 0.9,
-            ease: 'power4.out',
-          },
-          0.05
-        );
-      }
+      // Master Timeline (~1.35 seconds desktop duration)
+      const tl = gsap.timeline();
+      const durationB = reducedMotion ? 0.3 : 0.9;
+      const durationC = reducedMotion ? 0.15 : 0.35;
 
-      // C. Displace Top & Bottom Shell Bars off-screen
+      // Phase A (0.00 -> 0.15): Top and bottom bars slide off-screen
       if (topBarRef.current) {
         tl.to(
           topBarRef.current,
           {
             y: -80,
             opacity: 0,
-            duration: duration * 0.6,
-            ease: 'power4.out',
+            duration: 0.45,
+            ease: 'power3.out',
           },
           0
         );
@@ -219,57 +170,133 @@ export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({
           {
             y: 80,
             opacity: 0,
-            duration: duration * 0.6,
-            ease: 'power4.out',
+            duration: 0.45,
+            ease: 'power3.out',
           },
           0
         );
       }
 
-      // Mid-Flip Hero copy settling cue (around 75% expansion)
+      // Phase B (0.15 -> 0.95): Animate SVG aperture rect from fromRect to toRect
+      tl.to(
+        apertureEl,
+        {
+          attr: {
+            x: toRect.left,
+            y: toRect.top,
+            width: toRect.width,
+            height: toRect.height,
+          },
+          duration: durationB,
+          ease: 'power4.inOut',
+        },
+        0.15
+      );
+
+      // Simultaneously animate LoaderFrame geometry from fromRect to toRect
+      tl.to(
+        frameEl,
+        {
+          left: toRect.left,
+          top: toRect.top,
+          width: toRect.width,
+          height: toRect.height,
+          duration: durationB,
+          ease: 'power4.inOut',
+        },
+        0.15
+      );
+
+      // Phase C (0.90 -> 1.25): Expand aperture from Hero target to viewport bounds
+      tl.to(
+        apertureEl,
+        {
+          attr: {
+            x: 0,
+            y: 0,
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          duration: durationC,
+          ease: 'power4.out',
+        },
+        0.15 + durationB - 0.05
+      );
+
+      // Loader corner guides fade during final 150ms while Hero target guides reveal
+      tl.to(
+        frameEl,
+        {
+          opacity: 0,
+          duration: 0.18,
+          ease: 'power2.out',
+        },
+        0.15 + durationB + 0.1
+      );
+
+      // Phase D (~0.90): Allow Hero copy and Global Navigation to begin entering
       tl.call(
         () => {
           setIntroPhase('settling');
         },
         [],
-        duration * 0.72
+        0.90
+      );
+
+      // Phase E (~1.30): Ready state & completion handoff
+      tl.call(
+        () => {
+          setIntroPhase('ready');
+          setIsComplete(true);
+          onComplete();
+        },
+        [],
+        1.30
       );
     }
-  }, [state, reducedMotion, onComplete, setIntroPhase]);
+  }, [realProgress, displayProgress, reducedMotion, setIntroPhase, onComplete]);
 
-  if (state === 'HERO') {
+  if (isComplete) {
     return null;
   }
 
-  const isBenchmark = appMode === 'benchmark';
-
   return (
     <div
-      ref={containerRef}
       className="fixed inset-0 z-50 overflow-hidden pointer-events-none select-none"
       aria-live="polite"
       aria-label="System Initializing"
     >
-      {/* ========================================================================= */}
-      {/* 4 SPATIAL LIME SHUTTER PANELS (Top, Bottom, Left, Right)                  */}
-      {/* Displace outward beyond viewport bounds with GSAP Flip during HANDOFF     */}
-      {/* ========================================================================= */}
-      <div
-        ref={limeTopRef}
-        className="absolute top-0 left-0 right-0 h-1/2 bg-[#CFFE16] origin-top will-change-transform pointer-events-auto"
-      />
-      <div
-        ref={limeBottomRef}
-        className="absolute bottom-0 left-0 right-0 h-1/2 bg-[#CFFE16] origin-bottom will-change-transform pointer-events-auto"
-      />
-      <div
-        ref={limeLeftRef}
-        className="absolute top-0 bottom-0 left-0 w-1/2 bg-[#CFFE16] origin-left will-change-transform pointer-events-auto"
-      />
-      <div
-        ref={limeRightRef}
-        className="absolute top-0 bottom-0 right-0 w-1/2 bg-[#CFFE16] origin-right will-change-transform pointer-events-auto"
-      />
+      {/* Real Fullscreen SVG Aperture Mask */}
+      <svg
+        className="fixed inset-0 w-full h-full pointer-events-none"
+        width="100%"
+        height="100%"
+      >
+        <defs>
+          <mask id="reference-loader-mask">
+            {/* White base = Lime background visible */}
+            <rect x="0" y="0" width="100%" height="100%" fill="white" />
+
+            {/* Black hole = Transparent aperture revealing the real 3D Hero at z-0 */}
+            <rect
+              ref={apertureRef}
+              x={initialAperture.x}
+              y={initialAperture.y}
+              width={initialAperture.width}
+              height={initialAperture.height}
+              rx="0"
+              fill="black"
+            />
+          </mask>
+        </defs>
+
+        <rect
+          width="100%"
+          height="100%"
+          fill="#CFFE16"
+          mask="url(#reference-loader-mask)"
+        />
+      </svg>
 
       {/* Main Layout Viewport containing the Shared Frame */}
       <div className="relative z-10 w-full h-full flex flex-col justify-between p-6 sm:p-12 md:p-16 text-[#080808] pointer-events-none">
@@ -291,21 +318,17 @@ export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({
           </div>
         </div>
 
-        {/* 
-          CENTER: THE SHARED REFERENCE FRAME
-          Survives GSAP Flip and transforms physically into the Hero spatial frame!
-        */}
-        <div className="relative my-auto w-full flex items-center justify-center pointer-events-auto">
+        {/* Center: Shared Reference Frame */}
+        <div className="relative my-auto w-full flex items-center justify-center pointer-events-none">
           <LoaderFrame
-            state={state}
-            isHeroLayout={isHeroLayout}
+            ref={loaderFrameRef}
             displayProgress={displayProgress}
             innerRevealRatio={innerRevealRatio}
-            isBenchmark={isBenchmark}
+            isHandoff={isHandoff}
           />
         </div>
 
-        {/* Bottom Bar: Readiness Indicators & Honest Numeric Counter */}
+        {/* Bottom Bar: True Weighted Readiness Checklist & Numeric Counter */}
         <div
           ref={bottomBarRef}
           className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-t border-[#080808]/20 pt-6"
@@ -313,23 +336,31 @@ export const ReferenceLoader: React.FC<ReferenceLoaderProps> = ({
           {/* Readiness Indicators */}
           <div className="space-y-1">
             <div className="font-utility-mono text-xs tracking-wider uppercase font-bold text-[#080808]">
-              STARTUP PIPELINE
+              REAL ADAPTIVE PIPELINE [{qualityLevel}]
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[10px] font-utility-mono text-[#080808]/80">
-              <span className={readinessStages.fonts ? 'font-bold' : 'opacity-40'}>
-                {readinessStages.fonts ? '✓' : '○'} FONTS
+              <span className={readiness.baseFontsDom ? 'font-bold' : 'opacity-40'}>
+                {readiness.baseFontsDom ? '✓' : '○'} BASE/FONTS
               </span>
               <span>·</span>
-              <span className={readinessStages.webgl ? 'font-bold' : 'opacity-40'}>
-                {readinessStages.webgl ? '✓' : '○'} WEBGL
+              <span className={readiness.heroModulePhysics ? 'font-bold' : 'opacity-40'}>
+                {readiness.heroModulePhysics ? '✓' : '○'} MODULES
               </span>
               <span>·</span>
-              <span className={readinessStages.shaders ? 'font-bold' : 'opacity-40'}>
-                {readinessStages.shaders ? '✓' : '○'} SHADERS
+              <span className={readiness.rapierReady ? 'font-bold' : 'opacity-40'}>
+                {readiness.rapierReady ? '✓' : '○'} RAPIER
               </span>
               <span>·</span>
-              <span className={readinessStages.dom ? 'font-bold' : 'opacity-40'}>
-                {readinessStages.dom ? '✓' : '○'} DOM
+              <span className={readiness.fluidReady ? 'font-bold' : 'opacity-40'}>
+                {readiness.fluidReady ? '✓' : '○'} FLUID
+              </span>
+              <span>·</span>
+              <span className={readiness.shaderCompileReady ? 'font-bold' : 'opacity-40'}>
+                {readiness.shaderCompileReady ? '✓' : '○'} SHADERS
+              </span>
+              <span>·</span>
+              <span className={readiness.warmupReady ? 'font-bold' : 'opacity-40'}>
+                {readiness.warmupReady ? '✓' : '○'} WARMUP
               </span>
             </div>
           </div>

@@ -3,7 +3,6 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useExperience } from '../context/ExperienceContext';
 import { ArrowDown } from 'lucide-react';
-import { FLIP_IDS } from '../motion/flipIds';
 
 export const Scene02_03_Hero: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -98,42 +97,46 @@ export const Scene02_03_Hero: React.FC = () => {
         </div>
 
         {/* Center Target Frame for Scene 03 Shared Element Transition & Loader Handoff */}
-        <div className="relative z-10 mx-auto my-auto w-full max-w-xl h-72 sm:h-96 flex items-center justify-center">
+        <div className="relative z-10 mx-auto my-auto w-[92vw] h-[62vh] sm:h-[68vh] lg:h-[72vh] max-w-[1440px] max-h-[760px] flex items-center justify-center">
           <div
             ref={sharedMediaFrameRef}
-            data-flip-id={FLIP_IDS.FRAME}
+            data-hero-handoff-target="true"
             className={`w-full h-full relative flex items-center justify-center transition-all duration-500 pointer-events-auto ${
               isBenchmark
                 ? 'border border-white/20 bg-white/[0.02]'
-                : 'border border-white/10 hover:border-[#CFFE16]/30'
+                : 'border border-transparent'
             }`}
           >
-            {/* Corner crosshairs (connecting directly from the loader's exit geometry via GSAP Flip) */}
+            {/* Corner crosshairs: subtle in Presentation, prominent in Benchmark */}
             <div
-              data-flip-id={FLIP_IDS.CORNER_TL}
-              className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-[#CFFE16] transition-transform group-hover:scale-110"
+              className={`absolute -top-2 -left-2 w-3.5 h-3.5 border-t-2 border-l-2 transition-all duration-300 ${
+                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
+              }`}
             />
             <div
-              data-flip-id={FLIP_IDS.CORNER_TR}
-              className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-[#CFFE16] transition-transform group-hover:scale-110"
+              className={`absolute -top-2 -right-2 w-3.5 h-3.5 border-t-2 border-r-2 transition-all duration-300 ${
+                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
+              }`}
             />
             <div
-              data-flip-id={FLIP_IDS.CORNER_BL}
-              className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-[#CFFE16] transition-transform group-hover:scale-110"
+              className={`absolute -bottom-2 -left-2 w-3.5 h-3.5 border-b-2 border-l-2 transition-all duration-300 ${
+                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
+              }`}
             />
             <div
-              data-flip-id={FLIP_IDS.CORNER_BR}
-              className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-[#CFFE16] transition-transform group-hover:scale-110"
+              className={`absolute -bottom-2 -right-2 w-3.5 h-3.5 border-b-2 border-r-2 transition-all duration-300 ${
+                isBenchmark ? 'border-[#CFFE16]' : 'border-white/20'
+              }`}
             />
 
-            {/* Subtle metadata tags inside frame */}
+            {/* Benchmark-only metadata tags inside frame */}
             {isBenchmark && (
               <>
                 <div className="absolute top-3 left-3 text-[10px] font-utility-mono text-white/40 tracking-wider">
                   DOM/WEBGL SHARED BOUNDS
                 </div>
                 <div className="absolute bottom-3 right-3 text-[10px] font-utility-mono text-[#CFFE16] tracking-wider">
-                  [DRAG POINTER TO DISPLACE]
+                  [PHYSICAL REPULSION FIELD ACTIVE]
                 </div>
               </>
             )}
@@ -148,11 +151,11 @@ export const Scene02_03_Hero: React.FC = () => {
                 isHeroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
               }`}
             >
-              EDITORIAL BENCHMARK
+              EDITORIAL BENCHMARK // KINETIC CONSTELLATION
             </div>
             <div className="overflow-hidden py-1">
               <h1
-                className={`text-3xl sm:text-5xl md:text-6xl font-editorial-sans font-extrabold tracking-tighter uppercase leading-none transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[200ms] ${
+                className={`text-4xl sm:text-6xl md:text-7xl lg:text-[clamp(3.8rem,7.2vw,7.8rem)] font-editorial-sans font-black tracking-tighter uppercase leading-[0.88] transition-all duration-600 ease-[cubic-bezier(0.16,1,0.3,1)] delay-[200ms] ${
                   isHeroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                 }`}
               >

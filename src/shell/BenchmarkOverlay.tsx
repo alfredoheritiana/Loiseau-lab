@@ -2,7 +2,8 @@ import React from 'react';
 import { useExperience } from '../context/ExperienceContext';
 import { X, Activity } from 'lucide-react';
 import { QualityLevel } from '../types';
-import { FLIP_IDS, CANVAS_IDS } from '../motion/flipIds';
+import { CANVAS_IDS } from '../motion/flipIds';
+import { HERO_TIERS } from '../webgl/hero/heroConfig';
 
 export const BenchmarkOverlay: React.FC = () => {
   const {
@@ -12,6 +13,9 @@ export const BenchmarkOverlay: React.FC = () => {
     activeScene,
     qualityLevel,
     setQualityLevel,
+    deviceProfile,
+    manualQualityOverride,
+    readiness,
     reducedMotion,
     fps,
     frameTime,
@@ -25,12 +29,13 @@ export const BenchmarkOverlay: React.FC = () => {
 
   const inputs = inputsRef.current;
   const tiers: QualityLevel[] = ['HIGH', 'MEDIUM', 'LOW', 'STATIC'];
+  const heroTier = HERO_TIERS[qualityLevel] || HERO_TIERS.MEDIUM;
 
   return (
     <aside
       role="complementary"
       aria-label="Diagnostic Telemetry Console"
-      className="fixed bottom-4 right-4 z-50 w-84 bg-[#0e110c]/95 text-[#ECEEE5] border border-[#CFFE16]/50 p-4 font-utility-mono text-xs backdrop-blur-md shadow-2xl transition-all duration-200 pointer-events-auto"
+      className="fixed bottom-4 right-4 z-50 w-88 bg-[#0e110c]/95 text-[#ECEEE5] border border-[#CFFE16]/50 p-4 font-utility-mono text-xs backdrop-blur-md shadow-2xl transition-all duration-200 pointer-events-auto"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
@@ -52,14 +57,18 @@ export const BenchmarkOverlay: React.FC = () => {
         </div>
       </div>
 
-      {/* Phase 2 Architecture Validation Metrics */}
+      {/* Hero Physical Presence Subsystems (Section 53) */}
       <div className="border-b border-white/10 pb-2 mb-2 text-[10px] space-y-1">
-        <div className="text-white/50 uppercase font-bold tracking-wider">PHASE 2 FLIP & CANVAS STATUS:</div>
+        <div className="text-white/50 uppercase font-bold tracking-wider">HERO KINETIC CONSTELLATION:</div>
         <div className="grid grid-cols-2 gap-1 text-[10px]">
-          <div>INTRO PHASE: <span className="text-[#CFFE16] font-bold">{introPhase.toUpperCase()}</span></div>
-          <div>CANVAS: <span className="text-[#CFFE16] font-bold">ONE PERSISTENT</span></div>
-          <div>SHARED ID: <span className="text-white font-mono">{FLIP_IDS.FRAME}</span></div>
-          <div>WEBGL ID: <span className="text-white font-mono">{CANVAS_IDS.HERO_WINDOW}</span></div>
+          <div>AUTO PROFILE: <span className="text-[#CFFE16] font-bold">{deviceProfile.tier} ({deviceProfile.score}pts)</span></div>
+          <div>OVERRIDE: <span className={manualQualityOverride ? 'text-amber-400 font-bold' : 'text-white/60'}>{manualQualityOverride ? 'MANUAL' : 'AUTO'}</span></div>
+          <div>RAPIER PHYSICS: <span className={readiness.rapierReady ? 'text-[#CFFE16] font-bold' : 'text-white/50'}>{readiness.rapierReady ? 'ACTIVE' : 'INITIALIZING'}</span></div>
+          <div>FLUID SYSTEM: <span className={readiness.fluidReady ? 'text-[#CFFE16] font-bold' : 'text-white/50'}>{heroTier.fluidProfile.toUpperCase()}</span></div>
+          <div>SHADERS / WARMUP: <span className={readiness.shaderCompileReady && readiness.warmupReady ? 'text-[#CFFE16] font-bold' : 'text-white/50'}>{readiness.shaderCompileReady && readiness.warmupReady ? 'WARMED' : 'COMPILING'}</span></div>
+          <div>NODES / STRANDS: <span className="text-white font-mono">{heroTier.nodeCount} / {heroTier.connectorCount}</span></div>
+          <div>MICRO PARTICLES: <span className="text-white font-mono">{heroTier.particleCount}</span></div>
+          <div>POINTER DRAG: <span className={inputs?.pointerDown ? 'text-[#CFFE16] font-bold' : 'text-white/60'}>{inputs?.pointerDown ? 'ACTIVE' : 'IDLE'}</span></div>
         </div>
       </div>
 
@@ -103,7 +112,7 @@ export const BenchmarkOverlay: React.FC = () => {
 
       {/* Local Scene Progress Registers */}
       <div className="border-t border-white/10 pt-2 mb-3">
-        <div className="text-[10px] text-white/50 uppercase mb-1">DETERMINISTIC PROGRESS:</div>
+        <div className="text-[10px] text-white/50 uppercase mb-1">SCENE REGISTERS:</div>
         <div className="grid grid-cols-2 gap-1 text-[10px] font-mono">
           <div>HERO: {((inputs?.sceneProgress.hero || 0) * 100).toFixed(0)}%</div>
           <div>DEFORM: {((inputs?.sceneProgress.deformable || 0) * 100).toFixed(0)}%</div>
@@ -116,12 +125,12 @@ export const BenchmarkOverlay: React.FC = () => {
 
       {/* Manual Quality Tier Override */}
       <div className="border-t border-white/10 pt-2">
-        <div className="text-[10px] text-white/50 uppercase mb-1">QUALITY OVERRIDE:</div>
+        <div className="text-[10px] text-white/50 uppercase mb-1">MANUAL QUALITY OVERRIDE:</div>
         <div className="grid grid-cols-4 gap-1">
           {tiers.map((tier) => (
             <button
               key={tier}
-              onClick={() => setQualityLevel(tier)}
+              onClick={() => setQualityLevel(tier, true)}
               className={`py-1 text-[10px] text-center font-bold border transition-colors cursor-pointer ${
                 qualityLevel === tier
                   ? 'bg-[#CFFE16] text-[#080808] border-[#CFFE16]'

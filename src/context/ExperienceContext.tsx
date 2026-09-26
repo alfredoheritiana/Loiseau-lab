@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { QualityLevel, SceneId, DOMTrackedBounds, AppMode } from '../types';
+import { profileDevice, DeviceProfile } from '../utils/deviceProfiler';
+import { ReadinessStages } from '../loader/readinessStore';
 
 interface ExperienceContextType {
   // App mode: Presentation (default) vs Benchmark
@@ -9,7 +11,9 @@ interface ExperienceContextType {
 
   // Quality & motion
   qualityLevel: QualityLevel;
-  setQualityLevel: (level: QualityLevel) => void;
+  setQualityLevel: (level: QualityLevel, isManual?: boolean) => void;
+  deviceProfile: DeviceProfile;
+  manualQualityOverride: boolean;
   reducedMotion: boolean;
   debugMode: boolean;
   setDebugMode: (val: boolean | ((prev: boolean) => boolean)) => void;
@@ -29,6 +33,7 @@ interface ExperienceContextType {
     pointerVelX: number;
     pointerVelY: number;
     pointerVel: number;
+    pointerDown: boolean;
     scrollY: number;
     normalizedScroll: number;
     scrollVelocity: number;
@@ -52,6 +57,10 @@ interface ExperienceContextType {
     };
   }>;
 
+  // Real adaptive readiness stages
+  readiness: ReadinessStages;
+  setReadinessStage: (stage: keyof ReadinessStages, value: boolean) => void;
+
   // DOM tracking for WebGL projection
   registerTrackedElement: (id: string, element: HTMLElement) => void;
   unregisterTrackedElement: (id: string) => void;
@@ -67,6 +76,8 @@ interface ExperienceContextType {
   activeSceneName: string;
 }
 
+const initialProfile = profileDevice();
+
 const defaultInputs = {
   pointerX: 0,
   pointerY: 0,
@@ -75,13 +86,14 @@ const defaultInputs = {
   pointerVelX: 0,
   pointerVelY: 0,
   pointerVel: 0,
+  pointerDown: false,
   scrollY: 0,
   normalizedScroll: 0,
   scrollVelocity: 0,
   viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 1440,
   viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 900,
   aspectRatio: typeof window !== 'undefined' ? window.innerWidth / (window.innerHeight || 1) : 1.6,
-  dpr: typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1,
+  dpr: initialProfile.dpr,
   sceneProgress: {
     hero: 0,
     transition: 0,
@@ -128,7 +140,30 @@ export const ExperienceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     });
   }, []);
 
-  const [qualityLevel, setQualityLevel] = useState<QualityLevel>('HIGH');
+  const [qualityLevel, setQualityLevelState] = useState<QualityLevel>(initialProfile.tier);
+  const [manualQualityOverride, setManualQualityOverride] = useState(false);
+
+  const setQualityLevel = useCallback((level: QualityLevel, isManual: boolean = true) => {
+    setQualityLevelState(level);
+    if (isManual) {
+      setManualQualityOverride(true);
+    }
+  }, []);
+
+  const [readiness, setReadiness] = useState<ReadinessStages>({
+    baseFontsDom: false,
+    heroModulePhysics: false,
+    heroEnvironment: false,
+    rapierReady: false,
+    fluidReady: false,
+    shaderCompileReady: false,
+    warmupReady: false,
+  });
+
+  const setReadinessStage = useCallback((stage: keyof ReadinessStages, value: boolean) => {
+    setReadiness((prev) => (prev[stage] === value ? prev : { ...prev, [stage]: value }));
+  }, []);
+
   const [reducedMotion, setReducedMotion] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [activeScene, setActiveScene] = useState<SceneId>('scene-02-hero');
@@ -217,8 +252,21 @@ export const ExperienceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       lastY = pxY;
     };
 
+    const handlePointerDown = () => {
+      inputsRef.current.pointerDown = true;
+    };
+    const handlePointerUp = () => {
+      inputsRef.current.pointerDown = false;
+    };
+
     window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    return () => window.removeEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    window.addEventListener('pointerup', handlePointerUp, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
   }, []);
 
   // Window resize listener to cache viewport parameters
@@ -336,6 +384,10 @@ export const ExperienceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         toggleAppMode,
         qualityLevel,
         setQualityLevel,
+        deviceProfile: initialProfile,
+        manualQualityOverride,
+        readiness,
+        setReadinessStage,
         reducedMotion,
         debugMode,
         setDebugMode,
