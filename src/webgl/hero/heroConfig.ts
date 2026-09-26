@@ -5,54 +5,59 @@ export interface TierConfig {
   particleCount: number; // Exact particle count
   enableAO: boolean;
   enableBloom: boolean;
+  trailSteps: number;
   dprMax: number;
 }
 
 export const HERO_TIERS: Record<QualityLevel, TierConfig> = {
   HIGH: {
     simSize: 180,
-    particleCount: 180 * 180, // 32,400 particles (within 24k–40k)
+    particleCount: 180 * 180, // 32,400 particles (within 28k–42k)
     enableAO: true,
     enableBloom: true,
+    trailSteps: 12,
     dprMax: 1.75,
   },
   MEDIUM: {
     simSize: 140,
-    particleCount: 140 * 140, // 19,600 particles (within 14k–22k)
+    particleCount: 140 * 140, // 19,600 particles (within 16k–24k)
     enableAO: true,
     enableBloom: true,
+    trailSteps: 8,
     dprMax: 1.25,
   },
   LOW: {
     simSize: 100,
-    particleCount: 100 * 100, // 10,000 particles (within 7k–12k)
+    particleCount: 100 * 100, // 10,000 particles (within 8k–14k)
     enableAO: false,
     enableBloom: false,
+    trailSteps: 4,
     dprMax: 1.0,
   },
   STATIC: {
     simSize: 80,
-    particleCount: 80 * 80,   // 6,400 particles (within 4k–8k)
+    particleCount: 80 * 80,   // 6,400 particles (within 5k–9k)
     enableAO: false,
     enableBloom: false,
+    trailSteps: 2,
     dprMax: 1.0,
   },
 };
 
 export const HERO_COLORS = {
-  // 70–75% Dark Graphite / Smoked Ceramic / Anodized Titanium
-  GRAPHITE_DARK: '#111310',
-  GRAPHITE_SHEEN: '#1C201A',
+  // ~81% Pale Ivory / Cool Silver Particles
+  IVORY_SILVER: '#ECEEE5',
+  SILVER_PALE: '#DCE0D5',
 
-  // 20–25% Off-White Satin / Silver Grey
-  OFFWHITE_SATIN: '#D8DDD2',
-  OFFWHITE_PURE: '#ECEEE5',
+  // ~14% Dark Graphite / Ghost Particles
+  GRAPHITE_DARK: '#121411',
+  GRAPHITE_SHADOW: '#1A1D18',
 
-  // ~5% Signal Acid Lime (Rare, high-value visual accent)
+  // ~5% Signal Acid Lime Particles
   SIGNAL_LIME: '#CFFE16',
-  LIME_GLOW: '#98DE00',
+  LIME_PULSE: '#A6FA00',
 
-  // Ghost Core: subtle smoked glass
-  GHOST_CORE_GRAPHITE: '#0E100D',
-  GHOST_CORE_PALE: '#1A1D18',
+  // Ghost Core: Subtly smoked dark glass
+  GHOST_CORE_BODY: '#10130F',
+  GHOST_CORE_WING: '#161914',
 };

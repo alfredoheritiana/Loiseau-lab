@@ -1,64 +1,50 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { generateSculptureGeometries } from './HeroRibbonGeometry';
+import { generateBirdGeometries } from './HeroBirdGeometry';
 import { HERO_COLORS } from './heroConfig';
 
 interface HeroGhostCoreProps {
-  scrollProgress?: number;
+  opacity?: number;
 }
 
-export const HeroGhostCore: React.FC<HeroGhostCoreProps> = () => {
-  const { ribbonA, ribbonB, ribbonC } = useMemo(() => generateSculptureGeometries(), []);
+export const HeroGhostCore: React.FC<HeroGhostCoreProps> = ({ opacity = 0.08 }) => {
+  const { body, upperWing, lowerWing, tail } = useMemo(() => generateBirdGeometries(), []);
 
-  // Smoked dark glass / graphite material (Subtle 8–15% visual presence)
-  const matA = useMemo(
+  // Smoked dark glass / graphite material (Subtle 5–10% visual presence only)
+  const matBody = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: HERO_COLORS.GHOST_CORE_GRAPHITE,
-        roughness: 0.28,
-        metalness: 0.85,
-        clearcoat: 0.6,
-        clearcoatRoughness: 0.15,
-        transparent: true,
-        opacity: 0.12,
-        depthWrite: false,
-      }),
-    []
-  );
-
-  const matB = useMemo(
-    () =>
-      new THREE.MeshPhysicalMaterial({
-        color: HERO_COLORS.GHOST_CORE_PALE,
-        roughness: 0.38,
-        metalness: 0.25,
-        transparent: true,
-        opacity: 0.09,
-        depthWrite: false,
-      }),
-    []
-  );
-
-  const matC = useMemo(
-    () =>
-      new THREE.MeshPhysicalMaterial({
-        color: HERO_COLORS.SIGNAL_LIME,
-        emissive: HERO_COLORS.LIME_GLOW,
-        emissiveIntensity: 0.12,
+        color: HERO_COLORS.GHOST_CORE_BODY,
         roughness: 0.25,
-        metalness: 0.2,
+        metalness: 0.85,
+        clearcoat: 0.5,
+        clearcoatRoughness: 0.2,
         transparent: true,
-        opacity: 0.15,
+        opacity: opacity,
         depthWrite: false,
       }),
-    []
+    [opacity]
+  );
+
+  const matWing = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: HERO_COLORS.GHOST_CORE_WING,
+        roughness: 0.35,
+        metalness: 0.3,
+        transparent: true,
+        opacity: opacity * 0.75, // Even lighter on wings to let particles lead
+        depthWrite: false,
+      }),
+    [opacity]
   );
 
   return (
-    <group name="hero-ghost-core" renderOrder={1}>
-      <mesh geometry={ribbonA} material={matA} />
-      <mesh geometry={ribbonB} material={matB} />
-      <mesh geometry={ribbonC} material={matC} />
+    <group name="hero-swift-ghost-core" renderOrder={1}>
+      <mesh geometry={body} material={matBody} />
+      <mesh geometry={upperWing} material={matWing} />
+      <mesh geometry={lowerWing} material={matWing} />
+      <mesh geometry={tail} material={matBody} />
     </group>
   );
 };

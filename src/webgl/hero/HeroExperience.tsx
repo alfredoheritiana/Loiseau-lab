@@ -1,11 +1,10 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useExperience } from '../../context/ExperienceContext';
-import { HERO_TIERS } from './heroConfig';
 import { HeroLighting } from './HeroLighting';
 import { HeroGhostCore } from './HeroGhostCore';
-import { HeroParticleSculpture } from './HeroParticleSculpture';
+import { HeroParticleBird } from './HeroParticleBird';
 import { HeroPostFX } from './HeroPostFX';
 
 interface HeroExperienceProps {
@@ -25,13 +24,17 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
   onSimulationReady,
   onGhostCoreReady,
 }) => {
-  const { qualityLevel, setQualityLevel, inputsRef } = useExperience();
+  const { qualityLevel, setQualityLevel, inputsRef, introPhase } = useExperience();
   const { gl, scene, camera } = useThree();
 
   const groupRef = useRef<THREE.Group>(null);
   const warmupFrameCount = useRef(0);
   const warmupTimes = useRef<number[]>([]);
   const warmupFinished = useRef(false);
+
+  // Formation timer (starts when loader transition opens / introPhase reaches opening/expanding/settling/ready)
+  const formationTimeRef = useRef(0);
+  const [formationTime, setFormationTime] = useState(0);
 
   // 1. Mark geometry and ghost core ready upon mounting
   useEffect(() => {
@@ -91,33 +94,47 @@ export const HeroExperience: React.FC<HeroExperienceProps> = ({
     }
   });
 
-  // 4. Subtle camera / cluster evolution across the 220vh scroll range
-  useFrame(() => {
+  // 4. Update formation timer and scroll progression
+  useFrame((state, delta) => {
+    const dt = Math.min(delta, 0.033);
+
+    // Increment formation timer once aperture begins opening
+    if (introPhase !== 'loading' && introPhase !== 'tension') {
+      formationTimeRef.current += dt;
+      setFormationTime(formationTimeRef.current);
+    }
+
     if (!groupRef.current) return;
     const heroScroll = inputsRef.current?.sceneProgress.hero || progress || 0;
 
-    // First 35%: primary poster state
-    // 35% - 65%: gentle depth migration and slight core reorientation
-    // 65% - 100%: smooth exit
-    const zOffset = -heroScroll * 1.6;
-    const rotY = heroScroll * 0.25;
+    // Scroll migration: subtle depth drift and orientation shift
+    const zOffset = -heroScroll * 2.2;
+    const rotY = heroScroll * 0.22;
+    const rotX = -heroScroll * 0.12;
 
     groupRef.current.position.z = zOffset;
     groupRef.current.rotation.y = rotY;
+    groupRef.current.rotation.x = rotX;
   });
 
+  const heroScroll = inputsRef.current?.sceneProgress.hero || progress || 0;
+
+  // Ghost core opacity emerges during Act 3 & 4 (max 0.08)
+  const ghostOpacity = Math.max(0, Math.min(0.08, (formationTime - 0.8) * 0.06));
+
   return (
-    <group ref={groupRef} name="hero-particle-sculpture-experience">
+    <group ref={groupRef} name="hero-murmuration-swift-experience">
       {/* Studio Lighting Environment against #080808 */}
       <HeroLighting />
 
-      {/* Subtle Ghost-Core Mesh Underneath (~8–15% visual presence) */}
-      <HeroGhostCore scrollProgress={progress} />
+      {/* Subtle Ghost-Core Mesh Underneath (~5–8% visual presence) */}
+      <HeroGhostCore opacity={ghostOpacity} />
 
-      {/* Dense GPGPU Particle Sculpture */}
-      <HeroParticleSculpture
+      {/* The Murmuration Swift: Large GPGPU Particle Bird */}
+      <HeroParticleBird
         onReady={onSimulationReady}
-        scrollProgress={progress}
+        scrollProgress={heroScroll}
+        formationTime={formationTime}
       />
 
       {/* Postprocessing: Contact N8AO, High-Threshold Bloom & ACES Filmic */}

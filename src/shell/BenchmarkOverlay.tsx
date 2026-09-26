@@ -57,9 +57,9 @@ export const BenchmarkOverlay: React.FC = () => {
         </div>
       </div>
 
-      {/* Hero Particle Sculpture Subsystems */}
+      {/* Hero Particle Bird Subsystems */}
       <div className="border-b border-white/10 pb-2 mb-2 text-[10px] space-y-1">
-        <div className="text-white/50 uppercase font-bold tracking-wider">HERO PARTICLE SCULPTURE:</div>
+        <div className="text-white/50 uppercase font-bold tracking-wider">MURMURATION SWIFT // BIRD GPGPU:</div>
         <div className="grid grid-cols-2 gap-1 text-[10px]">
           <div>AUTO PROFILE: <span className="text-[#CFFE16] font-bold">{deviceProfile.tier} ({deviceProfile.score}pts)</span></div>
           <div>OVERRIDE: <span className={manualQualityOverride ? 'text-amber-400 font-bold' : 'text-white/60'}>{manualQualityOverride ? 'MANUAL' : 'AUTO'}</span></div>
@@ -67,8 +67,8 @@ export const BenchmarkOverlay: React.FC = () => {
           <div>GHOST CORE: <span className={readiness.ghostCoreReady ? 'text-[#CFFE16] font-bold' : 'text-white/50'}>{readiness.ghostCoreReady ? 'ACTIVE' : 'IDLE'}</span></div>
           <div>SHADERS / WARMUP: <span className={readiness.shaderCompileReady && readiness.warmupReady ? 'text-[#CFFE16] font-bold' : 'text-white/50'}>{readiness.shaderCompileReady && readiness.warmupReady ? 'WARMED' : 'COMPILING'}</span></div>
           <div>PARTICLES: <span className="text-white font-mono">{heroTier.particleCount.toLocaleString()} ({heroTier.simSize}²)</span></div>
-          <div>SCULPTURE: <span className="text-white font-mono">3 RIBBONS</span></div>
-          <div>POINTER: <span className={inputs?.pointerDown ? 'text-[#CFFE16] font-bold' : 'text-white/60'}>{inputs?.pointerDown ? 'ACTIVE DRAG' : 'FLOW REPEL'}</span></div>
+          <div>WIND WAKE: <span className="text-white font-mono">{heroTier.trailSteps} STEPS</span></div>
+          <div>POINTER: <span className={inputs?.pointerDown ? 'text-[#CFFE16] font-bold' : 'text-white/60'}>{inputs?.pointerDown ? 'AIR DRAG' : 'WIND WAKE'}</span></div>
         </div>
       </div>
 
