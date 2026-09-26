@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-dark: #080808;
+    --bg-surface: #181A17;
+    --color-offwhite: #ECEEE5;
+    --signal-green: #CFFE16;
+    --signal-blue: #2140FF;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-serif: 'Instrument Serif', Georgia, serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    color: var(--color-offwhite);
+    font-family: var(--font-sans);
+  }
+}
+
+/* Custom typography utilities */
+.font-editorial-serif {
+  font-family: 'Instrument Serif', Georgia, serif;
+}
+
+.font-editorial-sans {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.font-utility-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Lenis essential scroll integration */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* Custom utility classes */
+.text-signal-green {
+  color: #CFFE16;
+}
+
+.bg-signal-green {
+  background-color: #CFFE16;
+}
+
+.border-signal-green {
+  border-color: #CFFE16;
+}
+
+.text-signal-blue {
+  color: #2140FF;
+}
+
+.bg-signal-blue {
+  background-color: #2140FF;
+}
+
+.border-signal-blue {
+  border-color: #2140FF;
+}
+
+/* Hide scrollbars while maintaining scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
