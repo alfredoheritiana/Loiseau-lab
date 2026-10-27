@@ -1,5 +1,5 @@
 {
-  "name": "loiseau-reference-lab-00",
+  "name": "oryzo-reference-reconstruction-study",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "audit:install": "npm --prefix oryzo-reference install",
+    "audit:capture": "npm --prefix oryzo-reference run capture",
+    "audit:interactions": "npm --prefix oryzo-reference run interactions",
+    "audit:inventory": "npm --prefix oryzo-reference run inventory",
+    "audit:compare": "npm --prefix oryzo-reference run compare"
   },
   "dependencies": {
     "@14islands/r3f-scroll-rig": "^8.15.0",
