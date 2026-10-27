@@ -4,7 +4,7 @@ import path from 'node:path';
 
 const mode = process.env.MODE === 'local' ? 'local' : 'source';
 const url = process.env.URL || (mode === 'source' ? 'https://oryzo.ai/' : 'http://127.0.0.1:3000');
-const frames = Math.max(4, Math.min(30, Number(process.env.FRAMES || 12)));
+const frames = Math.max(4, Math.min(128, Number(process.env.FRAMES || 24)));
 const delay = Math.max(250, Number(process.env.SETTLE_MS || 850));
 const out = path.resolve('captures', mode);
 const viewports = [
