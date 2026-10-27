@@ -1,51 +1,75 @@
-# ORYZO — Fidelity Benchmark (LOISEAU LAB)
+# ORYZO REFERENCE LAB — étude et reconstruction (V3)
 
-This is an **isolated, non-published research harness** for measuring a future original reconstruction of [oryzo.ai](https://oryzo.ai/). It is **not** the Oryzo source project or the proprietary original asset bundle.
+**Attention : ce dépôt est un prototype de reconstruction, PAS une copie validée d'oryzo.ai à 100 %.** La branche principale de LOISEAU est intacte. Toutes les modifications ci-dessous concernent uniquement la branche experiences/oryzo-reference? Non : nom exact **experiments/oryzo-reference**.
 
-## Based on
-- Source-first playbook: https://github.com/SkyNotSilent/true-web-clone (MIT-licensed workflow)
-- Its public Oryzo case-study documentation: https://github.com/SkyNotSilent/true-web-clone/tree/main/examples/oryzo-ai
-- Official AI Studio Build mode with GitHub import/sync: https://ai.google.dev/gemini-api/docs/aistudio-build-mode
+## Ce qui est déjà prêt
 
-## First run
+- L'application qui démarre depuis la RACINE de cette branche affiche désormais une étude ORYZO indépendante : 3D WebGL persistante, modèle de coaster OFFICIEL sous licence MIT, chapitres narratifs et interactions de base.
+- Les docs et scripts de référence sont dans oryzo-reference/ : capteur Playwright, captures d'interactions, inventaire URL d'actifs 3D, comparaison pixel/geometry par frame.
+- Les méthodes publiques True Web Clone ont été intégrées dans method/ avec leur licence MIT; ce n'est pas un clone téléchargeable d'Oryzo.
+- Les scripts de capture ne sont pas exécutés automatiquement lors de l'import GitHub, et une simulation AI Studio n'a pas les droits/ressources des vrais assets Oryzo.
 
-From `oryzo-reference/`:
+## IMPORTANT — importer la bonne version dans Google AI Studio
 
-```bash
-npm install
-npx playwright install chromium
-npm run capture
-```
+1. Utiliser un **nouveau projet Build** (ne pas écraser un projet LOISEAU).
+2. Dans AI Studio, choisir Add files (+) > Import from GitHub (fonction documentée officiellement).
+3. Sélectionner alfredoheritiana/Loiseau-lab et, **si l'UI permet de choisir la branche**, choisir EXACTEMENT experiments/oryzo-reference. Vérifier que index.html indique ORYZO Reference et que src/App.tsx commence par l'étude Oryzo.
+4. **Si AI Studio impose la branche main, ne pas lancer de modifications** : main reste LOISEAU. Dans ce cas, créer un dépôt GitHub séparé à partir du contenu de cette branche, ou importer le code depuis un dépôt ORYZO dédié; ne pas changer le branchement principal du vrai site.
+5. Coller le texte intégral de GOOGLE_AI_STUDIO_PROMPT.md. La première phase imposée est le diagnostic/build, pas une génération complète improvisée.
 
-This captures the live public reference to `captures/source/`, including the rendered DOM, visible checkpoints, runtime indicators, public network resource URLs, and console/request failures. Playwright is required locally. Some GPU effects may differ under headless Chromium: verify with a real Chrome browser too.
+Source officielle AI Studio : https://ai.google.dev/gemini-api/docs/aistudio-build-mode
 
-Next, start **your own** reconstruction project on `http://127.0.0.1:3000` and run:
+## Démarrer l'application sur un environnement Node
 
-```bash
-MODE=local URL=http://127.0.0.1:3000 npm run capture
-npm run compare
-```
+À la RACINE du dépôt (bonne branche) :
+  npm install
+  npm run dev
+  npm run build
+  npm run lint
 
-Windows PowerShell:
+L'app s'ouvre sur http://127.0.0.1:3000. Une erreur de build doit être corrigée avant de poursuivre; aucune build réelle n'a été vérifiée dans cette session.
 
-```powershell
-$env:MODE="local"; $env:URL="http://127.0.0.1:3000"; npm run capture
-Remove-Item Env:MODE; Remove-Item Env:URL
-npm run compare
-```
+## Auditer le vrai site
 
-See `GOOGLE_AI_STUDIO_PROMPT.md` for the reconstruction phase, and `CHECKLIST.md` for acceptance gates.
+Playwright et Chromium se lancent depuis un environnement Node.js classique, par exemple local ou Codespaces. Google AI Studio peut ne pas fournir un vrai navigateur exécutable pour ces scripts.
 
-## What the public True Web Clone Oryzo report actually establishes
+  cd oryzo-reference
+  npm install
+  npx playwright install chromium
+  FRAMES=64 npm run capture
+  npm run interactions
+  npm run inventory
 
-The author reports a previous *local test* with ~25 MB / 156 files / 107 special scene resources / six canvas and zero local failed requests. **Those output files are not included in the public GitHub repository.** Its `outputs/oryzo-true-web-clone/` path is a report of an earlier local output, not a downloadable directory.
+Sur Windows PowerShell, utiliser :
+  $env:FRAMES="64"; npm run capture; Remove-Item Env:FRAMES
 
-Notable resource families in its case study: Astro bundles, Rive/WASM, `.buf` 3D animation buffers, `.sog` splats, textures, media and lazily loaded gallery files. Our initial captures **must not** be presented as a verified 100% clone.
+Outputs :
+- captures/source/{desktop,tablet,mobile}/frame-NN.png + capture.json et initial.html.
+- captures/source/interactions/...
+- reports/assets-manifest.json / assets-manifest.md
 
-## Separation from LOISEAU
+Les captures et rapports ne sont pas committés sur GitHub (voir .gitignore), en raison des ressources et données de tiers.
 
-Do not edit `src/App.tsx`, `src/scenes` or LOISEAU's live experience on this branch. Perform reference research and benchmarking here, then build a separately-owned implementation. No third-party Oryzo logos, proprietary models, fonts or original campaign content may be shipped in a published LOISEAU site without permission.
+## Comparer notre prototype
 
-## Verification language
+Démarrer d'abord la web app racine en localhost:3000. Dans le dossier oryzo-reference :
 
-Report actual screenshot/error/network metrics for each tested view and interaction. Do not call the job `100% identical` without matching motion timelines, layout, responsive behavior, input states, resource requests, and performance on target devices. A zero-404 check alone is not enough.
+Mac / Linux :
+  MODE=local URL=http://127.0.0.1:3000 FRAMES=64 npm run capture
+  MODE=local URL=http://127.0.0.1:3000 npm run interactions
+  npm run compare
+
+PowerShell :
+  $env:MODE="local"; $env:URL="http://127.0.0.1:3000"; $env:FRAMES="64"; npm run capture; npm run interactions
+  Remove-Item Env:MODE; Remove-Item Env:URL; Remove-Item Env:FRAMES
+  npm run compare
+
+Consulter reports/comparison.md, reports/comparison.json et les PNG de différence. Si les canvas/animations ont des états non déterministes, considérer le pixel mismatch comme un indicateur partiel et vérifier la timeline par d'autres moyens.
+
+## Contenus encore manquants
+
+Le rendu courant est un scaffold avec placeholders déclarés. Il manque notamment la vraie intro complète, l'univers 3D réaliste de l'atelier, les ressources propriétaires .sog/.buf/.riv/.wasm, les scènes caméra exactes, plusieurs interactions et la plupart des détails de post-processing. Lire ORYZO_REFERENCE_SPEC.md avant de considérer la reconstruction « terminée ».
+
+## Séparation des droits
+
+Le seul modèle Oryzo inclus dans le dépôt est officiel et MIT avec sa licence. La méthode True Web Clone est MIT également. Le site original, ses médias, textures, polices, scripts de production et marques **ne deviennent pas réutilisables commercialement** parce qu'ils sont visibles publiquement. La future version LOISEAU devra être originale ou autorisée.
