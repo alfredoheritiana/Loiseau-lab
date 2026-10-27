@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useLoader } from '@react-three/fiber';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
@@ -81,7 +81,7 @@ function AmbientProduct({ progress, pointer, layers }: {
   );
 }
 
-function Section({ id, className = '', children }: { id?: string; className?: string; children: React.ReactNode }) {
+function Section({ id, className = '', children }: { id?: string; className?: string; children: ReactNode }) {
   return <section id={id} className={'chapter ' + className}>{children}</section>;
 }
 
@@ -114,7 +114,7 @@ export default function App() {
       <AmbientProduct progress={progress} pointer={pointer} layers={models[variant].layers} />
       <header className="site-header">
         <a href="#intro" className="wordmark" onClick={() => setMobileMenu(false)}>ORYZO<span>®</span></a>
-        <nav className={mobileMenu ? 'main-nav open' : 'main-nav'} aria-label="Primary navigation">
+        <nav id="primary-navigation" className={mobileMenu ? 'main-nav open' : 'main-nav'} aria-label="Primary navigation">
           {headings.map((name, i) => (
             <a href={'#' + ['intro', 'features', 'product', 'contact'][i]} key={name} onClick={() => setMobileMenu(false)}>{name}</a>
           ))}
