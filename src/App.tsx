@@ -108,6 +108,11 @@ export default function App() {
     };
   }, []);
   useEffect(() => { document.body.style.overflow = mobileMenu ? 'hidden' : ''; return () => { document.body.style.overflow = ''; }; }, [mobileMenu]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileMenu(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const viewText = encoded ? message.split('').reverse().join('') : message;
   return (
     <div className="oryzo-study">
