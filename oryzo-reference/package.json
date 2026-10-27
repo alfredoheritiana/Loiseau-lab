@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "capture": "node capture.mjs",
+    "interactions": "node interactions.mjs",
+    "inventory": "node inventory.mjs",
     "compare": "node compare.mjs"
   },
   "devDependencies": {
