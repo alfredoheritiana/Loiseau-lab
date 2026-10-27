@@ -12,7 +12,8 @@ const tasks=[
  {id:'variant-pro',intent:'Change product variant to ORYZO Pro',role:'button',name:/^ORYZO Pro$/i,method:'click'},
  {id:'variant-max',intent:'Change product variant to ORYZO Pro Max',role:'button',name:/^ORYZO Pro Max$/i,method:'click'},
  {id:'hero-pointer',intent:'Trigger first visible canvas hover state',css:'canvas',method:'hover'},
- {id:'copy-url',intent:'Verify non-navigation button state, but do not execute side effects',role:'button',name:/copy url/i,method:'observe'}
+ {id:'smart-flip',intent:'Fill message and test encode/decode locally, never submit a form',role:'textbox',name:/message/i,method:'fill'},
+ {id:'copy-url',intent:'Observe the Copy URL control, no clipboard write',role:'button',name:/copy url/i,method:'observe'}
 ];
 const output={mode,url,generatedAt:new Date().toISOString(),results:[]};
 for(const viewport of [{name:'desktop',width:1440,height:900},{name:'mobile',width:390,height:844}]){
@@ -26,12 +27,21 @@ for(const viewport of [{name:'desktop',width:1440,height:900},{name:'mobile',wid
    await page.waitForTimeout(Number(process.env.INITIAL_MS||6000));
    const locator=task.css?page.locator(task.css).first():page.getByRole(task.role,{name:task.name}).first();
    if(await locator.count()===0){record.status='not_found';continue;}
+   if(!(await locator.isVisible())){record.status='hidden_in_viewport';continue;}
    await locator.scrollIntoViewIfNeeded({timeout:10000});
    await page.waitForTimeout(650);
    const basename=viewport.name+'-'+task.id;
    await page.screenshot({path:path.join(folder,basename+'-before.png'),timeout:45000});
    if(task.method==='click')await locator.click({timeout:10000});
-   else if(task.method==='hover')await locator.hover({timeout:10000});
+   else if(task.method==='hover'){
+     const box=await locator.boundingBox();
+     if(box)await page.mouse.move(box.x+box.width*.55,box.y+box.height*.5);
+   }
+   else if(task.method==='fill'){
+     await locator.fill('ORYZO REFERENCE');
+     const encode=page.getByRole('button',{name:/encode message/i}).first();
+     if(await encode.isVisible())await encode.click();
+   }
    await page.waitForTimeout(1100);
    await page.screenshot({path:path.join(folder,basename+'-after.png'),timeout:45000});
    if(task.escape)await page.keyboard.press('Escape');
