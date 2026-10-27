@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Third-party reference captures are local-only; do not push into GitHub.
+oryzo-reference/captures/
+oryzo-reference/reports/
