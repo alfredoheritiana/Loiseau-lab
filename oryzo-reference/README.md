@@ -1,6 +1,6 @@
 # ORYZO REFERENCE LAB — étude et reconstruction (V3)
 
-**Attention : ce dépôt est un prototype de reconstruction, PAS une copie validée d'oryzo.ai à 100 %.** La branche principale de LOISEAU est intacte. Toutes les modifications ci-dessous concernent uniquement la branche experiences/oryzo-reference? Non : nom exact **experiments/oryzo-reference**.
+**Attention : ce dépôt est un prototype de reconstruction, PAS une copie validée d'oryzo.ai à 100 %.** La branche principale de LOISEAU est intacte. Toutes les modifications ci-dessous concernent uniquement la branche **experiments/oryzo-reference**.
 
 ## Ce qui est déjà prêt
 
