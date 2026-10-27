@@ -1,6 +1,5 @@
 {
-  "name": "LOISEAU - Reference Lab 00",
-  "description": "High-end interactive website reconstruction laboratory benchmarking Lusion.co and LandoNorris.com interaction mechanics, WebGL continuity, and editorial scroll systems.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "ORYZO — WebGL fidelity study (independent)",
+  "description": "Private benchmark and independently coded study of Oryzo. NOT the official Lusion/Oryzo website. NO LOISEAU branding in this experiment.",
+  "requestFramePermissions": []
 }
