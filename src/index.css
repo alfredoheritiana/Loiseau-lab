@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-:root{font-family:'DM Sans',Arial,sans-serif;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;color:#fcf1e5;background:#20120e}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Literata:wght@400;500;600;700&display=swap');
+:root{font-family:'DM Sans',Arial,sans-serif;font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;color:#ffedd7;background:#100904}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;overflow-x:hidden}button,input{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}h1,h2,h3,p{margin-top:0}
 ::selection{background:#f3a556;color:#27140c}
-.oryzo-study{min-height:100vh;background:#20120e;position:relative;isolation:isolate}
+.oryzo-study{min-height:100vh;background:#100904;position:relative;isolation:isolate}
 .oryzo-study::before{position:fixed;inset:0;content:'';pointer-events:none;z-index:2;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");opacity:.13}
 .persistent-product{position:fixed;inset:0;pointer-events:none;z-index:3;mix-blend-mode:normal}
 .site-header{position:fixed;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;z-index:30;padding:17px clamp(20px,3.3vw,58px);color:#f7eee4;text-shadow:0 1px 8px #26130845}
@@ -11,7 +11,7 @@
 .main-nav{display:flex;align-items:center;gap:26px;text-transform:uppercase;font-size:11px;letter-spacing:.055em;font-weight:700}
 .main-nav a{transition:opacity .2s}.main-nav a:hover{opacity:.55}.menu-toggle{display:none}
 .chapter{position:relative;min-height:100svh;padding:clamp(100px,12vw,160px) clamp(20px,6vw,100px);display:flex;flex-direction:column;justify-content:center;z-index:4;isolation:isolate}
-.chapter h1,.chapter h2{font-family:'Space Grotesk',Arial,sans-serif;letter-spacing:-.07em;font-weight:600;line-height:.91;text-wrap:balance}
+.chapter h1,.chapter h2{font-family:'DM Sans',Arial,sans-serif;letter-spacing:-.07em;font-weight:600;line-height:.91;text-wrap:balance}
 .chapter h1{font-size:clamp(65px,10vw,190px)}.chapter h2{font-size:clamp(53px,9vw,155px)}.chapter p{max-width:660px}
 .chapter .eyebrow{font-size:12px;text-transform:uppercase;font-weight:700;letter-spacing:.09em;margin-bottom:30px}
 .chapter .tiny-note{font-size:11px;letter-spacing:.06em;line-height:1.5}
@@ -41,7 +41,7 @@
 .magazine-section{background:#b85831;min-height:120svh;align-items:center;text-align:center}
 .magazine-cover{border:2px solid #fce0bd;padding:clamp(25px,5vw,60px);width:min(90%,920px);box-shadow:22px 30px 70px #3a150f66;transform:rotate(-3deg)}
 .magazine-cover span{font-size:clamp(12px,2vw,22px);font-weight:700}
-.magazine-cover h2{font-size:clamp(80px,15vw,210px);margin-bottom:0}
+.magazine-cover h2{font-family:'Literata',Georgia,serif;font-size:clamp(80px,15vw,210px);margin-bottom:0}
 .features-section{background:#e8d6be;color:#351a0e;min-height:155svh}
 .features-section p:not(.eyebrow){margin-top:130px;max-width:470px}
 .thermal-section{background:radial-gradient(circle at 50% 80%,#542a19,#22110d 60%);min-height:145svh}
@@ -58,7 +58,7 @@
 .grip-section .measurement{font-family:'Space Grotesk';font-size:clamp(100px,19vw,300px);letter-spacing:-.12em;line-height:1;margin-top:70px}
 .measurement small{display:block;font-family:'DM Sans';font-size:12px;letter-spacing:.06em}
 .sustain-section{background:#324030;min-height:135svh}
-.reviews-section{background:#281913;min-height:135svh}
+.reviews-section{background:#100904;min-height:135svh}
 .review-list{max-width:1000px;display:grid;grid-template-columns:1fr 1fr;gap:25px}
 .review-list blockquote{font-size:clamp(24px,3vw,40px);font-family:'Space Grotesk';letter-spacing:-.04em;margin:0;padding:30px 0;border-top:1px solid #cab6a6}
 .review-list cite{font-family:'DM Sans';font-style:normal;display:block;font-size:13px;letter-spacing:0;margin-top:30px}
@@ -67,7 +67,7 @@
 .product-variants button{border:1px solid #4f392b;background:transparent;color:inherit;padding:14px 20px;border-radius:80px}
 .product-variants button.active{background:#40251a;color:#f8ede2}
 .product-section .variant-description{font-size:clamp(20px,3vw,32px);max-width:550px}
-.paper-section{background:#1a130f;min-height:105svh}
+.paper-section{background:#100904;min-height:105svh}
 .paper-section h2{font-size:clamp(82px,13vw,200px)}
 .paper-section .button-outline{margin-top:45px}
 .footer-section{background:#f4ecdf;color:#291912;min-height:105svh}
@@ -78,7 +78,7 @@
 @media(max-width:767px){
   .site-header{padding:18px 20px}
   .menu-toggle{display:block;color:inherit;border:1px solid currentColor;background:transparent;padding:8px 15px;border-radius:30px;text-transform:uppercase;font-size:12px}
-  .main-nav{display:none;position:fixed;inset:0;background:#281913;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:24px}
+  .main-nav{display:none;position:fixed;inset:0;background:#100904;flex-direction:column;align-items:center;justify-content:center;gap:30px;font-size:24px}
   .main-nav.open{display:flex}
   .menu-toggle{z-index:31}
   .chapter{min-height:95svh;padding:95px 24px 70px}
@@ -101,3 +101,6 @@
   .product-variants button{font-size:12px;padding:10px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.main-nav a,.button-outline{transition:none}}
+
+/* Reference palette from Lusion reporting; typography substituted where licensing is unavailable. */
+:root{--oryzo-ink:#100904;--oryzo-cream:#ffedd7;--oryzo-orange:#dc5000;--oryzo-olive:#445231}
